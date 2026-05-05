@@ -1,0 +1,97 @@
+<header class="app-header">
+  <a routerLink="/" class="brand">
+    <img class="brand-logo" src="/story-logo.png" width="40" height="40" alt="StoRy" />
+    <span class="brand-text">{{ title }}</span>
+  </a>
+  <nav>
+    @if (auth.loggedIn()) {
+      <a routerLink="/productos" routerLinkActive="active">Productos</a>
+      <a routerLink="/empresa" routerLinkActive="active">Empresa</a>
+    }
+  </nav>
+  <div class="header-actions">
+    @if (auth.loggedIn()) {
+      <div class="user-menu-wrap" #userMenuRoot>
+        <button
+          type="button"
+          class="user-menu-trigger"
+          (click)="toggleUserMenu($event)"
+          [attr.aria-expanded]="userMenuOpen()"
+          aria-haspopup="true"
+          [attr.aria-label]="'Menú de usuario: ' + userDisplayName()"
+        >
+          <span class="user-display-name">{{ userDisplayName() }}</span>
+          <span class="user-avatar-ring" aria-hidden="true">
+            <img
+              class="user-avatar-img"
+              src="/avatar-default.svg"
+              width="40"
+              height="40"
+              alt=""
+            />
+          </span>
+        </button>
+        @if (userMenuOpen()) {
+          <div class="user-dropdown" role="menu">
+            <a
+              routerLink="/perfil"
+              role="menuitem"
+              class="user-dropdown-item"
+              (click)="closeUserMenu()"
+            >
+              <svg class="user-dropdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
+                />
+              </svg>
+              <span>Perfil</span>
+            </a>
+            <a
+              routerLink="/empresa"
+              role="menuitem"
+              class="user-dropdown-item"
+              (click)="closeUserMenu()"
+            >
+              <svg class="user-dropdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3 21h18M4 21V7l8-4 8 4v14M9 21V11h6v10"
+                />
+              </svg>
+              <span>Empresa</span>
+            </a>
+            <div class="user-dropdown-divider" role="presentation"></div>
+            <button type="button" role="menuitem" class="user-dropdown-item" (click)="logout()">
+              <svg class="user-dropdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
+                />
+              </svg>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <a routerLink="/login" class="btn-ghost">Entrar</a>
+      <a routerLink="/register" class="btn-primary">Registro</a>
+    }
+  </div>
+</header>
+<main class="app-main">
+  <router-outlet />
+</main>

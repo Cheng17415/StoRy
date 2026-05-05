@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: story-postgres
+    environment:
+      POSTGRES_USER: story
+      POSTGRES_PASSWORD: story
+      POSTGRES_DB: story
+    ports:
+      - "5432:5432"
+    volumes:
+      - story_pgdata:/var/lib/postgresql/data
+
+volumes:
+  story_pgdata:

@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/story
+    username: story
+    password: story
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.story: debug
+
+app:
+  resend:
+    from: ${RESEND_FROM:StoRy <onboarding@resend.dev>}
