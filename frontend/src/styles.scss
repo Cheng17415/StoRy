@@ -1,8 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap');
+
+/* SaaS / datos: azul primario + ámbar para CTAs y acentos (WCAG-friendly, contraste claro) */
 :root {
-  --story-bg-header: #202124;
-  --story-bg-page: #f6f7f8;
-  --story-primary: #00aeef;
-  --story-text: #222;
+  --story-bg-header: #0f172a;
+  --story-bg-page: #f8fafc;
+  --story-surface: #ffffff;
+  --story-primary: #1e40af;
+  --story-primary-hover: #1d4ed8;
+  --story-secondary: #3b82f6;
+  --story-accent: #f59e0b;
+  --story-accent-muted: #d97706;
+  --story-text: #1e293b;
+  --story-text-muted: #64748b;
+  --story-border: #e2e8f0;
+  --story-border-strong: #cbd5e1;
+  --story-on-primary: #ffffff;
+  --story-danger: #b91c1c;
+  --story-success: #15803d;
+  --story-focus-ring: rgba(59, 130, 246, 0.45);
 }
 
 *,
@@ -13,7 +28,7 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Open Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   color: var(--story-text);
   background: var(--story-bg-page);
@@ -21,4 +36,8 @@ body {
 
 a {
   color: var(--story-primary);
+}
+
+a:hover {
+  color: var(--story-primary-hover);
 }
