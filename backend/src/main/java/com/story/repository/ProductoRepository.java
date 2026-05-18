@@ -148,7 +148,7 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
 
               )
 
-            ORDER BY (p.stockMinimo - p.cantidad) DESC, p.nombre ASC
+            ORDER BY p.nombre ASC
 
             """)
 

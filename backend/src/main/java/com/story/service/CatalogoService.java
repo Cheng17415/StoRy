@@ -113,6 +113,10 @@ public class CatalogoService {
     public List<ProductoResponse> listarProductosBajoMinimo(Long categoriaId) {
         Long companyId = currentUserService.requireCurrentCompanyId();
         return productoRepository.findBajoStockMinimo(companyId, categoriaId).stream()
+                .sorted(Comparator
+                        .comparingInt((Producto p) -> p.getStockMinimo() - p.getCantidad())
+                        .reversed()
+                        .thenComparing(p -> p.getNombre(), String.CASE_INSENSITIVE_ORDER))
                 .map(this::toResponse)
                 .toList();
     }
