@@ -2,6 +2,8 @@
 
 Proyecto DAM: inventario tipo BOM. Incluye **backend** (Spring Boot) y **frontend** (Angular).
 
+La base de datos es **PostgreSQL en Supabase** (no hay Postgres local en el repositorio).
+
 ## Inicio rápido (scripts)
 
 Desde la **raíz del repositorio** (donde están `backend/`, `frontend/` y `scripts/`):
@@ -11,66 +13,35 @@ Desde la **raíz del repositorio** (donde están `backend/`, `frontend/` y `scri
 | Backend | `.\scripts\start-backend.ps1` | `scripts\start-backend.cmd` |
 | Frontend | `.\scripts\start-frontend.ps1` | `scripts\start-frontend.cmd` |
 
-El backend usa `backend\mvnw.cmd spring-boot:run`. El frontend ejecuta `npm run start` en `frontend/` (Angular en `http://localhost:4200` con **proxy** a `http://localhost:8080` definido en `frontend/proxy.conf.json`).
+El backend usa `backend\mvnw.cmd spring-boot:run` y lee **`.env`** en la raíz (Supabase + OAuth + Resend). El frontend ejecuta `npm run start` en `frontend/` (Angular en `http://localhost:4200` con **proxy** a `http://localhost:8080` definido en `frontend/proxy.conf.json`).
 
-Orden habitual: 1) PostgreSQL en marcha, 2) backend, 3) frontend.
+Orden habitual: 1) copiar `.env.example` → `.env` y rellenar credenciales de Supabase, 2) backend, 3) frontend.
 
 ## Backend (`backend/`)
 
-Requisitos: **JDK 17+** y **PostgreSQL** (el perfil por defecto es `dev` y espera la base en `localhost`).
+Requisitos: **JDK 17+** y proyecto **Supabase** con la base ya creada (esquema vía Flyway o migraciones previas).
 
-**Flyway:** si creaste las tablas a mano con `scripts/postgres/init_complete.sql` (sin tabla `flyway_schema_history`), el backend está configurado con `baseline-on-migrate` para alinear Flyway con ese esquema. En una base **vacía**, Flyway sigue aplicando `V1__init.sql` con normalidad.
+### Configuración Supabase
 
-### Base de datos PostgreSQL
+1. En [Supabase Dashboard](https://supabase.com/dashboard) → tu proyecto → **Connect** → **Session mode** (pooler, IPv4).
+2. Copia host, usuario (`postgres.<project_ref>`) y contraseña de base de datos.
+3. En la raíz del repo, `.env` (plantilla en `.env.example`):
 
-Credenciales por defecto del proyecto: usuario `story`, contraseña `story`, base `story` (véase `backend/src/main/resources/application-dev.yml`).
-
-**Opción A – Docker Compose (recomendado si tienes Docker)**
-
-En la raíz del repositorio:
-
-```bash
-docker compose up -d
+```env
+SPRING_DATASOURCE_URL=jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require
+SPRING_DATASOURCE_USERNAME=postgres.<project_ref>
+SPRING_DATASOURCE_PASSWORD=<contraseña Database>
 ```
 
-Eso crea usuario, contraseña y base `story`. Las **tablas** las crea **Flyway** la primera vez que arrancas el backend (`spring-boot:run`).
+**Nota:** el host directo `db.<ref>.supabase.co` suele ser solo IPv6; en Windows/red sin IPv6 usa el **Session pooler** del dashboard (p. ej. `aws-1-<region>.pooler.supabase.com`).
 
-**Opción B – Script SQL completo (rol + base + tablas) con `psql`**
-
-Útil si tienes PostgreSQL instalado y quieres el DDL sin depender de Flyway (por ejemplo para inspección en pgAdmin). Desde la raíz del repo, como superusuario `postgres`:
-
-```bash
-# Windows PowerShell (ajusta la contraseña de postgres)
-$env:PGPASSWORD = "tu_password_postgres"
-psql -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -f scripts/postgres/init_complete.sql
-```
-
-Si `psql` no está en el PATH, usa la ruta del ejecutable (ajusta la versión si no es la 18):
-
-```powershell
-$env:PGPASSWORD = "tu_password_postgres"
-& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -f scripts/postgres/init_complete.sql
-```
-
-Puedes añadir `C:\Program Files\PostgreSQL\18\bin` a la variable de entorno **Path** de Windows para invocar `psql` sin ruta completa.
-
-Si tras el `\c` pide contraseña del rol `story`: `$env:PGPASSWORD = "story"` y vuelve a ejecutar solo la parte de tablas, o ejecuta en dos pasos los archivos `scripts/postgres/01_create_role_and_database.sql` y luego `02_schema.sql` conectado a `story`.
-
-**Importante:** si ya aplicaste `init_complete.sql` (tablas creadas), no mezcles con Flyway en la misma base sin alinear el historial de migraciones; lo habitual con este repo es **Compose + Flyway** o **init_complete.sql** para un entorno solo SQL.
-
-**Opción C – Docker sin Compose**
-
-```bash
-docker run --name story-postgres -e POSTGRES_USER=story -e POSTGRES_PASSWORD=story -e POSTGRES_DB=story -p 5432:5432 -d postgres:16
-```
-
-Luego arranca el backend para que **Flyway** aplique `backend/src/main/resources/db/migration/V1__init.sql`.
+**Flyway:** en el primer arranque contra una base vacía aplica `backend/src/main/resources/db/migration/`. Si el esquema ya existe sin `flyway_schema_history`, el perfil `dev` hace baseline en la versión 8.
 
 ### Ejecutar la API
 
 Desde la raíz del repo: `.\scripts\start-backend.ps1` o `scripts\start-backend.cmd`.
 
-O desde la carpeta `backend`:
+O desde la carpeta `backend` (con las variables `SPRING_DATASOURCE_*` exportadas):
 
 ```bash
 .\mvnw.cmd spring-boot:run
@@ -82,7 +53,7 @@ En Linux o macOS:
 ./mvnw spring-boot:run
 ```
 
-Perfil y datasource por defecto están en `application-dev.yml`. Para producción, define por ejemplo `SPRING_PROFILES_ACTIVE=prod` y las propiedades `spring.datasource.*` (o variables equivalentes) sin commitear secretos.
+Para producción, define `SPRING_PROFILES_ACTIVE=prod` y las propiedades `spring.datasource.*` sin commitear secretos.
 
 ### Endpoints de ejemplo
 
@@ -127,3 +98,5 @@ Build de producción: `cd frontend && npm run build`.
 ## Esquema de datos
 
 Ver [estructura.txt](estructura.txt) (modelo PostgreSQL: usuarios, perfiles, categorías, productos, movimientos de stock).
+
+Los scripts en `scripts/postgres/` son históricos (entorno local); el entorno oficial es Supabase + Flyway.

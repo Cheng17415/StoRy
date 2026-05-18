@@ -33,6 +33,8 @@ export const routes: Routes = [
     canActivate: [estadisticasGuard],
     loadComponent: () =>
       import('./features/inventario/estadisticas.component').then((m) => m.EstadisticasComponent),
+  },
+  {
     path: 'stock-bajo',
     canActivate: [authGuard],
     loadComponent: () =>

@@ -340,7 +340,7 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
           </div>
         </section>
 
-        @if (data.items.length !== 0){
+        @if (vm.pageData.items.length !== 0){
           @switch (layoutMode()) {
             @case ('grid') {
               <div class="card-grid">

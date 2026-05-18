@@ -1,6 +1,6 @@
-# Inicia el backend Spring Boot (perfil dev por defecto).
+# Inicia el backend Spring Boot (perfil dev → Postgres en Supabase).
 # Uso desde la raíz del repositorio: .\scripts\start-backend.ps1
-# Si existe .env en la raíz del repo, carga variables en este proceso (p. ej. GOOGLE_CLIENT_ID).
+# Requiere .env con SPRING_DATASOURCE_* (y opcionalmente GOOGLE_CLIENT_ID, RESEND_*).
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path

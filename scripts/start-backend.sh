@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Inicia el backend Spring Boot (perfil dev por defecto).
+# Inicia el backend Spring Boot (perfil dev → Postgres en Supabase).
 # Uso: ./scripts/start-backend.sh  (desde cualquier directorio)
-# Si existe .env en la raíz del repo, carga variables en este proceso (p. ej. GOOGLE_CLIENT_ID).
+# Requiere .env con SPRING_DATASOURCE_* (y opcionalmente GOOGLE_CLIENT_ID, RESEND_*).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
