@@ -63,6 +63,10 @@ public class Producto {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carpeta_id")
+    private ProductoCarpeta carpeta;
+
     public Long getId() {
         return id;
     }
@@ -173,5 +177,13 @@ public class Producto {
 
     public void setCompany(Company company) {
         this.company = company;
+    }
+
+    public ProductoCarpeta getCarpeta() {
+        return carpeta;
+    }
+
+    public void setCarpeta(ProductoCarpeta carpeta) {
+        this.carpeta = carpeta;
     }
 }

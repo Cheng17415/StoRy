@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+  <title>StoRy</title>
+  <defs>
+    <linearGradient id="story-card" x1="6" y1="32" x2="34" y2="8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e40af"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="story-page" x1="10" y1="28" x2="30" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#dbeafe" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.98"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="9" width="22" height="26" rx="5" ry="5" fill="rgba(59,130,246,0.38)"/>
+  <rect x="9" y="5" width="24" height="28" rx="5.5" ry="5.5" fill="url(#story-card)"/>
+  <rect x="12.5" y="9" width="17" height="20" rx="3" ry="3" fill="url(#story-page)"/>
+  <rect x="14.5" y="13" width="13" height="2.2" rx="1.1" fill="#94a3b8"/>
+  <rect x="14.5" y="17.8" width="10" height="2.2" rx="1.1" fill="#cbd5e1"/>
+  <rect x="14.5" y="22.6" width="11.5" height="2.2" rx="1.1" fill="#cbd5e1"/>
+
+  <rect x="25.5" y="5.5" width="6.5" height="11.95" rx="1.2" ry="1.2" fill="#f59e0b"/>
+  <polygon fill="#f59e0b" points="25.5,17.45 32,17.45 28.75,26.85"/>
+</svg>

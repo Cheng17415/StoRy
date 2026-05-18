@@ -82,6 +82,73 @@ public class InventarioService {
         movimientoStockRepository.save(m);
     }
 
+    @Transactional
+    public MovimientoStockResponse registrarMovimientoManual(
+            Long productoId,
+            TipoMovimiento tipo,
+            int cantidad,
+            String observacionRaw
+    ) {
+        currentUserService.requireRoleAtLeastEmployee();
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        Producto p = productoRepository
+                .findByIdAndCompany_Id(productoId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        String observacion = normalizeObservacion(observacionRaw);
+        int anterior = p.getCantidad();
+        final int movCantidadEnRegistro;
+        final int nuevo;
+
+        if (tipo == TipoMovimiento.ENTRADA) {
+            if (cantidad < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La entrada debe ser de al menos 1 unidad");
+            }
+            nuevo = anterior + cantidad;
+            movCantidadEnRegistro = cantidad;
+        } else if (tipo == TipoMovimiento.SALIDA) {
+            if (cantidad < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La salida debe ser de al menos 1 unidad");
+            }
+            if (anterior < cantidad) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stock insuficiente para esta salida");
+            }
+            nuevo = anterior - cantidad;
+            movCantidadEnRegistro = cantidad;
+        } else if (tipo == TipoMovimiento.AJUSTE) {
+            if (cantidad < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad tras el ajuste no puede ser negativa");
+            }
+            if (cantidad == anterior) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad es igual al stock actual");
+            }
+            nuevo = cantidad;
+            movCantidadEnRegistro = nuevo;
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de movimiento no soportado");
+        }
+
+        p.setCantidad(nuevo);
+        p.setFechaActualizacion(Instant.now());
+        productoRepository.save(p);
+
+        MovimientoStock m = nuevoMovimientoBase(p);
+        m.setTipo(tipo);
+        m.setCantidad(movCantidadEnRegistro);
+        m.setObservacion(observacion);
+        movimientoStockRepository.save(m);
+
+        return toResponse(m);
+    }
+
+    private static String normalizeObservacion(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String t = raw.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     private MovimientoStock nuevoMovimientoBase(Producto producto) {
         MovimientoStock m = new MovimientoStock();
         m.setProducto(producto);

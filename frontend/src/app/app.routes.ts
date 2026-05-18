@@ -29,6 +29,12 @@ export const routes: Routes = [
       import('./features/catalogo/productos.component').then((m) => m.ProductosComponent),
   },
   {
+    path: 'stock-bajo',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogo/stock-bajo-minimo.component').then((m) => m.StockBajoMinimoComponent),
+  },
+  {
     path: 'producto/:id',
     canActivate: [authGuard],
     loadComponent: () =>
