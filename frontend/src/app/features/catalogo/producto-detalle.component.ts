@@ -534,7 +534,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       border-radius: 18px;
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
       position: relative;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .pd-hero::before {
@@ -685,19 +685,24 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      background: #f1f5f9;
+      border: 1px solid var(--pd-border);
+      border-radius: 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
     }
 
     .pd-icon-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 2.35rem;
+      height: 2.35rem;
       padding: 0;
-      border: 1px solid var(--story-border-strong, #cbd5e1);
+      border: 1px solid transparent;
       border-radius: 10px;
-      background: #ffffff;
+      background: transparent;
       color: var(--pd-muted);
       cursor: pointer;
       transition:
@@ -707,9 +712,10 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     }
 
     .pd-icon-btn:hover:not(:disabled) {
-      background: var(--pd-primary-soft);
-      border-color: var(--pd-primary);
+      background: #ffffff;
+      border-color: var(--pd-border);
       color: var(--pd-primary);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     }
 
     .pd-icon-btn:focus-visible {
@@ -728,7 +734,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
     .pd-more-panel {
       position: absolute;
-      top: calc(100% + 6px);
+      top: calc(100% + 10px);
       right: 0;
       min-width: 12rem;
       padding: 0.4rem;
@@ -736,7 +742,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       border: 1px solid var(--pd-border);
       border-radius: 12px;
       box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 0 1px rgba(15, 23, 42, 0.08);
-      z-index: 20;
+      z-index: 80;
     }
 
     .pd-more-item {
@@ -835,10 +841,10 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       align-items: center;
       justify-content: center;
       gap: 0.45rem;
-      height: 2.5rem;
-      padding: 0 1.05rem;
+      height: 2.35rem;
+      padding: 0 0.95rem;
       border-radius: 10px;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 600;
       cursor: pointer;
       transition:
@@ -850,25 +856,29 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     }
 
     .pd-btn-edit {
-      border: 1px solid var(--pd-primary);
-      background: linear-gradient(180deg, var(--story-secondary, #3b82f6) 0%, var(--pd-primary) 100%);
-      color: var(--story-on-primary, #fff);
-      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.25);
+      border: 1px solid transparent;
+      background: #ffffff;
+      color: var(--pd-primary);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     }
 
     .pd-btn-edit:hover {
-      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.32);
+      background: var(--pd-primary-soft);
+      border-color: rgba(30, 64, 175, 0.2);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
     }
 
     .pd-btn-save {
       border: 1px solid var(--pd-primary);
-      background: linear-gradient(180deg, var(--story-secondary, #3b82f6) 0%, var(--pd-primary) 100%);
+      background: var(--pd-primary);
       color: var(--story-on-primary, #fff);
-      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.28);
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
     }
 
     .pd-btn-save:hover:not(:disabled) {
-      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.35);
+      background: var(--story-primary-hover, #1d4ed8);
+      border-color: var(--story-primary-hover, #1d4ed8);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
     }
 
     .pd-btn-save:active:not(:disabled),
@@ -883,14 +893,16 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     }
 
     .pd-btn-secondary {
-      border: 1px solid var(--story-border-strong, #cbd5e1);
-      background: #ffffff;
-      color: var(--pd-text);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--pd-muted);
     }
 
     .pd-btn-secondary:hover:not(:disabled) {
-      border-color: #94a3b8;
-      background: #f8fafc;
+      border-color: var(--pd-border);
+      background: #ffffff;
+      color: var(--pd-text);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
     }
 
     .pd-btn-secondary:disabled {
