@@ -15,11 +15,11 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     <div class="pd-page">
       <nav class="pd-breadcrumb" aria-label="Migas de pan">
         <a routerLink="/productos" class="pd-back">
-          <span class="pd-back-icon" aria-hidden="true">←</span>
-          Catálogo
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6" />
+          </svg>
+          Volver al catálogo
         </a>
-        <span class="pd-bc-sep" aria-hidden="true">/</span>
-        <span class="pd-bc-current">Detalle</span>
       </nav>
 
       @if (loadError()) {
@@ -97,18 +97,41 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
               </div>
             }
             @if (canEditProduct()) {
-              <button type="button" class="pd-btn-edit" (click)="toggleEdit()">
-                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                  />
-                </svg>
-                {{ editMode() ? 'Ver' : 'Editar' }}
-              </button>
+              @if (editMode()) {
+                <button type="button" class="pd-btn-secondary" (click)="toggleEdit()" [disabled]="saving()">
+                  Cancelar
+                </button>
+                <button type="button" class="pd-btn-save" [disabled]="form.invalid || saving()" (click)="save()">
+                  @if (saving()) {
+                    <span class="pd-spinner" aria-hidden="true"></span>
+                    Guardando…
+                  } @else {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8" />
+                    </svg>
+                    Guardar cambios
+                  }
+                </button>
+              } @else {
+                <button type="button" class="pd-btn-edit" (click)="toggleEdit()">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  Editar
+                </button>
+              }
             }
           </div>
         </header>
+
+        @if (editMode() && formError()) {
+          <div class="pd-hero-error" role="alert">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            </svg>
+            <span>{{ formError() }}</span>
+          </div>
+        }
 
         <section class="pd-metrics" aria-label="Resumen de inventario">
           <div class="pd-metric">
@@ -305,18 +328,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
           <!-- Columna derecha -->
           <div class="pd-col pd-col--side">
-            @if (editMode() && canEditProduct()) {
-              <section class="pd-card pd-card--form">
-                <h2 class="pd-card-title">Guardar cambios</h2>
-                @if (formError()) {
-                  <p class="error">{{ formError() }}</p>
-                }
-                <button type="button" class="pd-btn-save" [disabled]="form.invalid || saving()" (click)="save()">
-                  {{ saving() ? 'Guardando…' : 'Guardar' }}
-                </button>
-              </section>
-            }
-
             <section class="pd-card" id="pd-historial">
               <h2 class="pd-card-title">Historial de stock</h2>
               @if (movLoading()) {
@@ -427,49 +438,33 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
     .pd-breadcrumb {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
-      gap: 0.35rem;
-      margin-bottom: 1.35rem;
+      margin-bottom: 1.1rem;
       font-size: 0.8125rem;
     }
 
     .pd-back {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.4rem;
       font-weight: 600;
-      color: var(--pd-primary);
+      font-size: 0.85rem;
+      color: var(--pd-muted);
       text-decoration: none;
-      padding: 0.35rem 0.6rem;
-      margin: -0.35rem -0.6rem;
+      padding: 0.4rem 0.7rem;
+      margin-left: -0.7rem;
       border-radius: 8px;
       transition: background 0.15s ease, color 0.15s ease;
     }
 
-    .pd-back-icon {
-      font-size: 1rem;
-      opacity: 0.85;
-    }
-
     .pd-back:hover {
       background: var(--pd-primary-soft);
-      color: var(--story-primary-hover, #1d4ed8);
+      color: var(--pd-primary);
     }
 
     .pd-back:focus-visible {
       outline: 2px solid var(--story-focus-ring, rgba(59, 130, 246, 0.45));
       outline-offset: 2px;
-    }
-
-    .pd-bc-sep {
-      color: var(--pd-border);
-      user-select: none;
-    }
-
-    .pd-bc-current {
-      color: var(--pd-muted);
-      font-weight: 500;
     }
 
     .pd-loading {
@@ -532,13 +527,14 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       align-items: flex-start;
       justify-content: space-between;
       gap: 1.25rem;
-      margin-bottom: 1.5rem;
-      padding: 1.35rem 1.5rem;
-      background: var(--pd-card);
+      margin-bottom: 1.25rem;
+      padding: 1.5rem 1.65rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border: 1px solid var(--pd-border);
-      border-radius: 16px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+      border-radius: 18px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
       position: relative;
+      overflow: hidden;
     }
 
     .pd-hero::before {
@@ -548,9 +544,25 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       left: 0;
       right: 0;
       height: 3px;
-      border-radius: 16px 16px 0 0;
-      background: linear-gradient(90deg, var(--pd-primary), var(--story-secondary, #3b82f6));
-      opacity: 0.85;
+      background: linear-gradient(90deg, var(--pd-primary) 0%, var(--story-secondary, #3b82f6) 60%, var(--story-accent, #f59e0b) 100%);
+    }
+
+    .pd-hero-error {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: -0.4rem 0 1.25rem;
+      padding: 0.7rem 0.9rem;
+      background: var(--pd-danger-soft);
+      border: 1px solid rgba(185, 28, 28, 0.22);
+      border-radius: 12px;
+      color: var(--pd-danger);
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .pd-hero-error svg {
+      flex-shrink: 0;
     }
 
     .pd-hero-main {
@@ -680,23 +692,23 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2.6rem;
-      height: 2.6rem;
+      width: 2.5rem;
+      height: 2.5rem;
       padding: 0;
-      border: 1px solid var(--pd-border);
+      border: 1px solid var(--story-border-strong, #cbd5e1);
       border-radius: 10px;
-      background: var(--pd-card);
+      background: #ffffff;
       color: var(--pd-muted);
       cursor: pointer;
       transition:
-        background 0.15s ease,
-        border-color 0.15s ease,
-        color 0.15s ease;
+        background 0.18s ease,
+        border-color 0.18s ease,
+        color 0.18s ease;
     }
 
     .pd-icon-btn:hover:not(:disabled) {
       background: var(--pd-primary-soft);
-      border-color: rgba(30, 64, 175, 0.25);
+      border-color: var(--pd-primary);
       color: var(--pd-primary);
     }
 
@@ -718,29 +730,31 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       position: absolute;
       top: calc(100% + 6px);
       right: 0;
-      min-width: 11rem;
-      padding: 0.35rem 0;
+      min-width: 12rem;
+      padding: 0.4rem;
       background: var(--pd-card);
       border: 1px solid var(--pd-border);
-      border-radius: 10px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 0 1px rgba(15, 23, 42, 0.08);
       z-index: 20;
     }
 
     .pd-more-item {
       display: block;
       width: 100%;
-      padding: 0.5rem 1rem;
+      padding: 0.55rem 0.75rem;
       border: none;
+      border-radius: 8px;
       background: transparent;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       text-align: left;
       cursor: pointer;
       color: var(--pd-text);
+      transition: background 0.12s ease;
     }
 
     .pd-more-item:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .pd-more-item.danger {
@@ -814,33 +828,94 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       background: var(--pd-card);
     }
 
-    .pd-btn-edit {
+    .pd-btn-edit,
+    .pd-btn-save,
+    .pd-btn-secondary {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.55rem 1.1rem;
-      border: none;
+      justify-content: center;
+      gap: 0.45rem;
+      height: 2.5rem;
+      padding: 0 1.05rem;
       border-radius: 10px;
-      background: var(--pd-primary);
-      color: var(--story-on-primary, #fff);
-      font-size: 0.8125rem;
+      font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25);
       transition:
         background 0.18s ease,
+        border-color 0.18s ease,
         box-shadow 0.18s ease,
-        transform 0.12s ease;
+        color 0.18s ease,
+        transform 0.05s ease;
+    }
+
+    .pd-btn-edit {
+      border: 1px solid var(--pd-primary);
+      background: linear-gradient(180deg, var(--story-secondary, #3b82f6) 0%, var(--pd-primary) 100%);
+      color: var(--story-on-primary, #fff);
+      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.25);
     }
 
     .pd-btn-edit:hover {
-      background: var(--story-primary-hover, #1d4ed8);
-      box-shadow: 0 3px 10px rgba(30, 64, 175, 0.3);
+      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.32);
     }
 
-    .pd-btn-edit:focus-visible {
-      outline: 2px solid var(--story-focus-ring);
-      outline-offset: 2px;
+    .pd-btn-save {
+      border: 1px solid var(--pd-primary);
+      background: linear-gradient(180deg, var(--story-secondary, #3b82f6) 0%, var(--pd-primary) 100%);
+      color: var(--story-on-primary, #fff);
+      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.28);
+    }
+
+    .pd-btn-save:hover:not(:disabled) {
+      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.35);
+    }
+
+    .pd-btn-save:active:not(:disabled),
+    .pd-btn-edit:active {
+      transform: translateY(1px);
+    }
+
+    .pd-btn-save:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .pd-btn-secondary {
+      border: 1px solid var(--story-border-strong, #cbd5e1);
+      background: #ffffff;
+      color: var(--pd-text);
+    }
+
+    .pd-btn-secondary:hover:not(:disabled) {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+
+    .pd-btn-secondary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .pd-btn-edit:focus-visible,
+    .pd-btn-save:focus-visible,
+    .pd-btn-secondary:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--story-focus-ring, rgba(59, 130, 246, 0.45));
+    }
+
+    .pd-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: pd-spin 0.8s linear infinite;
+    }
+
+    @keyframes pd-spin {
+      to { transform: rotate(360deg); }
     }
 
     .pd-metrics {
@@ -863,8 +938,14 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       padding: 1.05rem 1.15rem;
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
       transition:
-        border-color 0.15s ease,
-        box-shadow 0.15s ease;
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+    }
+
+    .pd-metric:hover {
+      border-color: var(--story-border-strong, #cbd5e1);
+      transform: translateY(-1px);
     }
 
     .pd-metric--accent {
@@ -961,7 +1042,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       border-radius: 16px;
       padding: 1.35rem 1.45rem;
       margin-bottom: 1rem;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.03);
     }
 
     .pd-card-title {
@@ -1296,60 +1377,34 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     }
 
     .pd-card--barcode {
-      background: var(--pd-bg);
-      border-style: dashed;
+      background: linear-gradient(180deg, #ffffff 0%, var(--pd-bg) 100%);
     }
 
     .pd-card--barcode .pd-barcode-label {
-      margin: 0 0 0.5rem;
-      font-size: 0.75rem;
+      margin: 0 0 0.55rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: var(--pd-muted);
     }
 
     .pd-barcode-num {
       margin: 0;
-      padding: 0.65rem 0.75rem;
+      padding: 0.85rem 1rem;
       font-family: ui-monospace, 'Cascadia Code', monospace;
-      font-size: 0.875rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
       text-align: center;
-      color: var(--pd-text);
-      background: var(--pd-card);
-      border: 1px solid var(--pd-border);
-      border-radius: 10px;
-    }
-
-    .pd-card--form .pd-btn-save {
-      padding: 0.6rem 1.35rem;
-      border: none;
-      border-radius: 10px;
-      background: var(--pd-primary);
-      color: var(--story-on-primary, #fff);
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25);
-      transition: background 0.18s ease, box-shadow 0.18s ease;
-    }
-
-    .pd-card--form .pd-btn-save:hover:not(:disabled) {
-      background: var(--story-primary-hover, #1d4ed8);
-      box-shadow: 0 3px 10px rgba(30, 64, 175, 0.28);
-    }
-
-    .pd-card--form .pd-btn-save:focus-visible {
-      outline: 2px solid var(--story-focus-ring);
-      outline-offset: 2px;
-    }
-
-    .pd-card--form .pd-btn-save:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
+      color: var(--pd-primary);
+      background: var(--pd-primary-soft);
+      border: 1px dashed rgba(30, 64, 175, 0.3);
+      border-radius: 12px;
     }
 
     .error {
-      color: #b00020;
+      color: var(--pd-danger);
       font-size: 0.85rem;
       margin: 0 0 0.75rem;
     }
