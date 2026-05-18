@@ -2,16 +2,21 @@ package com.story.controller;
 
 import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
+import com.story.model.MoverProductoCarpetaRequest;
 import com.story.model.ProductoResponse;
+import com.story.model.RegistrarMovimientoRequest;
 import com.story.service.CatalogoService;
 import com.story.service.InventarioService;
 import org.springframework.format.annotation.DateTimeFormat;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -38,8 +43,13 @@ public class ProductoController {
     }
 
     @GetMapping
-    public List<ProductoResponse> listar() {
-        return catalogoService.listarProductos();
+    public List<ProductoResponse> listar(@RequestParam(required = false) Long carpetaId) {
+        return catalogoService.listarProductos(carpetaId);
+    }
+
+    @GetMapping("/bajo-minimo")
+    public List<ProductoResponse> listarBajoMinimo(@RequestParam(required = false) Long categoriaId) {
+        return catalogoService.listarProductosBajoMinimo(categoriaId);
     }
 
     /**
@@ -68,6 +78,19 @@ public class ProductoController {
         return inventarioService.listarMovimientosPorProducto(id);
     }
 
+    @PostMapping("/{id}/movimiento")
+    public MovimientoStockResponse registrarMovimiento(
+            @PathVariable Long id,
+            @Valid @RequestBody RegistrarMovimientoRequest body
+    ) {
+        return inventarioService.registrarMovimientoManual(
+                id,
+                body.tipo(),
+                body.cantidad(),
+                body.observacion()
+        );
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public ProductoResponse crear(
@@ -76,9 +99,10 @@ public class ProductoController {
             @RequestParam BigDecimal precio,
             @RequestParam(required = false) String stockMinimo,
             @RequestParam(required = false) String descripcion,
-            @RequestParam(required = false) MultipartFile imagen
+            @RequestParam(required = false) MultipartFile imagen,
+            @RequestParam(required = false) Long carpetaId
     ) {
-        return catalogoService.crearProducto(nombre, cantidad, precio, stockMinimo, descripcion, imagen);
+        return catalogoService.crearProducto(nombre, cantidad, precio, stockMinimo, descripcion, imagen, carpetaId);
     }
 
     /**
@@ -94,9 +118,21 @@ public class ProductoController {
             @RequestParam BigDecimal precio,
             @RequestParam(required = false) String stockMinimo,
             @RequestParam(required = false) String descripcion,
-            @RequestParam(required = false) MultipartFile imagen
+            @RequestParam(required = false) MultipartFile imagen,
+            @RequestParam(required = false) String carpetaId
     ) {
-        return catalogoService.actualizarProducto(id, nombre, cantidad, precio, stockMinimo, descripcion, imagen);
+        return catalogoService.actualizarProducto(id, nombre, cantidad, precio, stockMinimo, descripcion, imagen, carpetaId);
+    }
+
+    @PatchMapping("/{id}/carpeta")
+    public ProductoResponse moverCarpeta(@PathVariable Long id, @RequestBody MoverProductoCarpetaRequest body) {
+        return catalogoService.moverProductoCarpeta(id, body.carpetaId());
+    }
+
+    @PostMapping("/{id}/clone")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProductoResponse clonar(@PathVariable Long id) {
+        return catalogoService.clonarProducto(id);
     }
 
     @DeleteMapping("/{id}")

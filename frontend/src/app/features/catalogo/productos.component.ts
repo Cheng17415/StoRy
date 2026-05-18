@@ -4,16 +4,17 @@ import {
   ElementRef,
   HostListener,
   inject,
+  OnInit,
   signal,
   viewChild,
 } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
-import { BehaviorSubject, combineLatest, map, switchMap } from 'rxjs';
-import { MovimientoStockDto, ProductoDto } from '../../core/models/catalogo.models';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BehaviorSubject, catchError, combineLatest, map, of, switchMap, tap } from 'rxjs';
+import { CarpetaArbolDto, MovimientoStockDto, ProductoDto } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
-import { CatalogoApiService } from '../../core/services/catalogo-api.service';
+import { CatalogoApiService, ProductoFormPayload } from '../../core/services/catalogo-api.service';
 
 interface ProductosPageData {
   items: ProductoDto[];
@@ -49,6 +50,74 @@ function readStoredLayout(): LayoutMode {
   return 'grid';
 }
 
+function carpetasEnNivel(arbol: CarpetaArbolDto[], carpetaActualId: number | null): CarpetaArbolDto[] {
+  if (carpetaActualId === null) {
+    return arbol;
+  }
+  const queue = [...arbol];
+  while (queue.length) {
+    const n = queue.shift()!;
+    if (n.id === carpetaActualId) {
+      return n.hijos ?? [];
+    }
+    queue.push(...(n.hijos ?? []));
+  }
+  return [];
+}
+
+function findCarpetaNode(nodes: CarpetaArbolDto[], id: number): CarpetaArbolDto | null {
+  for (const n of nodes) {
+    if (n.id === id) {
+      return n;
+    }
+    const ch = findCarpetaNode(n.hijos ?? [], id);
+    if (ch) {
+      return ch;
+    }
+  }
+  return null;
+}
+
+function collectCarpetaSubtreeIds(nodes: CarpetaArbolDto[], rootId: number): Set<number> {
+  const root = findCarpetaNode(nodes, rootId);
+  const out = new Set<number>();
+  if (!root) {
+    out.add(rootId);
+    return out;
+  }
+  const walk = (n: CarpetaArbolDto) => {
+    out.add(n.id);
+    for (const h of n.hijos ?? []) {
+      walk(h);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+function flattenCarpetaOptions(nodes: CarpetaArbolDto[], depth = 0): { id: number; label: string }[] {
+  const rows: { id: number; label: string }[] = [];
+  const pad = depth === 0 ? '' : `${'· '.repeat(depth)}`;
+  for (const n of nodes) {
+    rows.push({ id: n.id, label: `${pad}${n.nombre}`.trim() });
+    rows.push(...flattenCarpetaOptions(n.hijos ?? [], depth + 1));
+  }
+  return rows;
+}
+
+function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number; nombre: string }[] {
+  for (const n of nodes) {
+    if (n.id === targetId) {
+      return [{ id: n.id, nombre: n.nombre }];
+    }
+    const sub = pathToFolder(n.hijos ?? [], targetId);
+    if (sub.length) {
+      return [{ id: n.id, nombre: n.nombre }, ...sub];
+    }
+  }
+  return [];
+}
+
 @Component({
   selector: 'app-productos',
   standalone: true,
@@ -58,11 +127,23 @@ function readStoredLayout(): LayoutMode {
       <header class="page-head">
         <h1 class="page-title">Todos los productos</h1>
         <div class="page-head-actions">
+          @if (canManageFolders()) {
+            <button type="button" class="btn-secondary-header" (click)="openCreateFolder()">Nueva carpeta</button>
+          }
           @if (canCreateProduct()) {
             <button type="button" class="btn-cta" (click)="openCreate()">Añadir producto</button>
           }
         </div>
       </header>
+
+      <nav class="folder-bc" aria-label="Ubicación">
+        @for (crumb of breadcrumbs(); track idx; let idx = $index) {
+          @if (idx > 0) {
+            <span class="folder-bc-sep" aria-hidden="true">/</span>
+          }
+          <button type="button" class="folder-bc-link" (click)="goBreadcrumb(idx)">{{ crumb.nombre }}</button>
+        }
+      </nav>
 
       <section class="toolbar-strip">
         <div class="search-wrap">
@@ -187,28 +268,83 @@ function readStoredLayout(): LayoutMode {
         </div>
       </section>
 
-      @if (pageData$ | async; as data) {
+      @if (vm$ | async; as vm) {
+        @if (vm.subcarpetas.length > 0) {
+          <section class="folder-strip" aria-label="Subcarpetas">
+            @for (d of vm.subcarpetas; track d.id) {
+              <div class="folder-row">
+                <button type="button" class="folder-open" (click)="enterFolder(d)">
+                  @if (d.imagen) {
+                    <span class="folder-thumb-wrap">
+                      <img [src]="d.imagen" [alt]="''" class="folder-thumb" />
+                    </span>
+                  } @else {
+                    <span class="folder-glyph" aria-hidden="true"></span>
+                  }
+                  <span class="folder-open-label">{{ d.nombre }}</span>
+                </button>
+                @if (canManageFolders()) {
+                  <div class="folder-item-menu-root" data-stop-nav>
+                    <button
+                      type="button"
+                      class="card-kebab"
+                      [class.open]="folderMenuId() === d.id"
+                      [attr.aria-expanded]="folderMenuId() === d.id"
+                      aria-haspopup="menu"
+                      aria-label="Más acciones en carpeta"
+                      (click)="toggleFolderMenu(d.id, $event)"
+                    >
+                      <svg class="card-kebab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="5" r="2" fill="currentColor" />
+                        <circle cx="12" cy="12" r="2" fill="currentColor" />
+                        <circle cx="12" cy="19" r="2" fill="currentColor" />
+                      </svg>
+                    </button>
+                    @if (folderMenuId() === d.id) {
+                      <div class="card-dropdown card-dropdown--left" role="menu">
+                        <button type="button" role="menuitem" class="card-dd-item" (click)="renameFolderPrompt(d)">
+                          Renombrar
+                        </button>
+                        <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
+                          Mover…
+                        </button>
+                        <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
+                          Clonar carpeta
+                        </button>
+                        @if (canDeleteProduct()) {
+                          <button type="button" role="menuitem" class="card-dd-item danger" (click)="deleteFolderConfirm(d)">
+                            Eliminar carpeta
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        }
+
         <section class="stats-bar" aria-label="Resumen">
           <div class="stat">
             <span class="stat-label">Productos</span>
-            <span class="stat-value">{{ data.itemCount }}</span>
+            <span class="stat-value">{{ vm.pageData.itemCount }}</span>
           </div>
           <div class="stat">
             <span class="stat-label">Cantidad total</span>
-            <span class="stat-value">{{ data.totalQty }} uds.</span>
+            <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
           </div>
           <div class="stat">
             <span class="stat-label">Valor total</span>
-            <span class="stat-value">{{ data.totalValue | currency: companyCurrency() }}</span>
+            <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
           </div>
         </section>
 
-        @if (data.items.length === 0) {
-        } @else {
+        @if (data.items.length !== 0){
           @switch (layoutMode()) {
             @case ('grid') {
               <div class="card-grid">
-                @for (p of data.items; track p.id) {
+                @for (p of vm.pageData.items; track p.id) {
                   <article class="product-card product-card--click" (click)="goToProducto(p.id, $event)">
                     <div class="card-image-wrap">
                       @if (p.imagen) {
@@ -243,6 +379,14 @@ function readStoredLayout(): LayoutMode {
                               <button type="button" role="menuitem" class="card-dd-item" (click)="openHistorial(p)">
                                 Historial de stock
                               </button>
+                              @if (canEmployeeCatalog()) {
+                                <button type="button" role="menuitem" class="card-dd-item" (click)="cloneProductFromMenu(p)">
+                                  Clonar
+                                </button>
+                                <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
+                                  Mover a carpeta…
+                                </button>
+                              }
                               @if (canDeleteProduct()) {
                                 <button
                                   type="button"
@@ -278,7 +422,7 @@ function readStoredLayout(): LayoutMode {
             }
             @case ('list') {
               <div class="product-list">
-                @for (p of data.items; track p.id) {
+                @for (p of vm.pageData.items; track p.id) {
                   <article class="product-list-row" (click)="goToProducto(p.id, $event)">
                     <div class="list-thumb">
                       @if (p.imagen) {
@@ -327,6 +471,14 @@ function readStoredLayout(): LayoutMode {
                           <button type="button" role="menuitem" class="card-dd-item" (click)="openHistorial(p)">
                             Historial de stock
                           </button>
+                          @if (canEmployeeCatalog()) {
+                            <button type="button" role="menuitem" class="card-dd-item" (click)="cloneProductFromMenu(p)">
+                              Clonar
+                            </button>
+                            <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
+                              Mover a carpeta…
+                            </button>
+                          }
                           @if (canDeleteProduct()) {
                             <button
                               type="button"
@@ -359,7 +511,7 @@ function readStoredLayout(): LayoutMode {
                     </tr>
                   </thead>
                   <tbody>
-                    @for (p of data.items; track p.id) {
+                    @for (p of vm.pageData.items; track p.id) {
                       <tr
                         [class.row-stock-bajo]="esStockBajo(p)"
                         class="product-table-row"
@@ -410,6 +562,24 @@ function readStoredLayout(): LayoutMode {
                                 >
                                   Historial de stock
                                 </button>
+                                @if (canEmployeeCatalog()) {
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    class="card-dd-item"
+                                    (click)="cloneProductFromMenu(p)"
+                                  >
+                                    Clonar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    class="card-dd-item"
+                                    (click)="openMoveProductDialog(p)"
+                                  >
+                                    Mover a carpeta…
+                                  </button>
+                                }
                                 @if (canDeleteProduct()) {
                                   <button
                                     type="button"
@@ -552,6 +722,76 @@ function readStoredLayout(): LayoutMode {
         </form>
       </div>
     </dialog>
+
+    <dialog #folderDialog class="modal" (cancel)="$event.preventDefault()">
+      <div class="modal-inner">
+        <h3>Nueva carpeta</h3>
+        <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
+          <label>
+            Nombre
+            <input type="text" formControlName="nombre" />
+          </label>
+          <label>
+            Notas (opcional)
+            <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre la carpeta"></textarea>
+          </label>
+          <label class="photo-field">
+            <span class="photo-field-label">Foto</span>
+            <div class="photo-upload">
+              <div class="photo-upload-inner">
+                <svg
+                  class="photo-upload-icon"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
+                  />
+                </svg>
+                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
+              </div>
+              <input
+                type="file"
+                class="photo-upload-input"
+                aria-label="Subir foto de la carpeta"
+                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
+                (change)="onFolderFile($event)"
+              />
+            </div>
+          </label>
+          @if (folderFormError()) {
+            <p class="error">{{ folderFormError() }}</p>
+          }
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="closeFolderDialog()">Cancelar</button>
+            <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog #moveTargetDialog class="modal" (cancel)="$event.preventDefault()">
+      <div class="modal-inner">
+        <h3>{{ moveDialogTitle() }}</h3>
+        <label>
+          Carpeta destino
+          <select #moveTargetSelect class="move-target-select">
+            @for (opt of moveSelectOptions(); track opt.label + ':' + (opt.id ?? 'root')) {
+              <option [value]="opt.id === null ? '' : '' + opt.id">{{ opt.label }}</option>
+            }
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeMoveDialog()">Cancelar</button>
+          <button type="button" class="btn-submit" (click)="confirmMoveTarget(moveTargetSelect.value)">Mover</button>
+        </div>
+      </div>
+    </dialog>
   `,
   styles: `
     :host {
@@ -587,6 +827,143 @@ function readStoredLayout(): LayoutMode {
       font-weight: 700;
       letter-spacing: -0.02em;
       color: #111827;
+    }
+
+    .page-head-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .btn-secondary-header {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.55rem 1rem;
+      border-radius: 4px;
+      border: 1px solid var(--inv-border);
+      background: var(--inv-surface);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #374151;
+    }
+
+    .btn-secondary-header:hover {
+      border-color: #d1d5db;
+      background: #f9fafb;
+    }
+
+    .folder-bc {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0 0 1rem;
+      font-size: 0.9rem;
+    }
+
+    .folder-bc-link {
+      border: none;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      color: #374151;
+      font: inherit;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .folder-bc-link:hover {
+      color: var(--inv-cta);
+    }
+
+    .folder-bc-sep {
+      color: var(--inv-muted);
+      user-select: none;
+    }
+
+    .folder-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .folder-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--inv-border);
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .folder-open {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      color: #111827;
+      text-align: left;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .folder-open:hover {
+      color: var(--inv-cta);
+    }
+
+    .folder-glyph {
+      width: 1.25rem;
+      height: 1rem;
+      border-radius: 2px;
+      border: 2px solid #6b7280;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+
+    .folder-thumb-wrap {
+      flex-shrink: 0;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--inv-border);
+      background: #fff;
+    }
+
+    .folder-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .folder-open-label {
+      min-width: 0;
+    }
+
+    .move-target-select {
+      margin-top: 0.35rem;
+      width: 100%;
+      padding: 0.45rem 0.5rem;
+      border: 1px solid var(--inv-border);
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    .folder-item-menu-root {
+      position: relative;
+      flex-shrink: 0;
     }
 
     .btn-cta {
@@ -1599,16 +1976,32 @@ function readStoredLayout(): LayoutMode {
     }
   `,
 })
-export class ProductosComponent {
+export class ProductosComponent implements OnInit {
   private readonly api = inject(CatalogoApiService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   private readonly reload$ = new BehaviorSubject(0);
   private readonly search$ = new BehaviorSubject('');
 
   protected readonly searchTerm = signal('');
+
+  protected readonly breadcrumbs = signal<{ id: number | null; nombre: string }[]>([
+    { id: null, nombre: 'Productos' },
+  ]);
+  protected readonly currentCarpetaId = signal<number | null>(null);
+  private readonly carpetaId$ = toObservable(this.currentCarpetaId);
+
+  /** Menú ⋮ por carpeta */
+  protected readonly folderMenuId = signal<number | null>(null);
+  protected readonly moveDialogTitle = signal('Mover');
+  protected readonly moveSelectOptions = signal<{ id: number | null; label: string }[]>([]);
+  private pendingFolderMove: CarpetaArbolDto | null = null;
+  private pendingProductMove: ProductoDto | null = null;
+
+  private readonly latestArbol = signal<CarpetaArbolDto[]>([]);
 
   /** Criterio activo: primer clic en un criterio usa dirección por defecto; segundo clic en el mismo alterna asc/desc. */
   protected readonly sortState = signal<SortState>({ field: 'name', dir: 'asc' });
@@ -1637,21 +2030,37 @@ export class ProductosComponent {
 
   private readonly sortState$ = toObservable(this.sortState);
 
-  protected readonly pageData$ = combineLatest([
-    this.reload$.pipe(switchMap(() => this.api.getProductos())),
+  protected readonly vm$ = combineLatest([
+    this.reload$,
+    this.carpetaId$,
     this.search$,
     this.sortState$,
   ]).pipe(
-    map((args) => {
-      const [list, q, sort] = args as [ProductoDto[], string, SortState];
-      return this.buildPageData(list, q, sort);
-    }),
+    switchMap(([_, fid, q, sort]) =>
+      this.api.getProductos(fid).pipe(
+        switchMap((productos) =>
+          this.api.getCarpetasArbol().pipe(
+            catchError(() => {
+              this.latestArbol.set([]);
+              return of<CarpetaArbolDto[]>([]);
+            }),
+            tap((arbol) => this.latestArbol.set(arbol)),
+            map((arbol) => ({
+              pageData: this.buildPageData(productos, q, sort),
+              subcarpetas: carpetasEnNivel(arbol, fid),
+            })),
+          ),
+        ),
+      ),
+    ),
   );
 
   private readonly sortDropdownRef = viewChild<ElementRef<HTMLElement>>('sortDropdown');
   private readonly layoutDropdownRef = viewChild<ElementRef<HTMLElement>>('layoutDropdown');
   private readonly historialDialogRef = viewChild<ElementRef<HTMLDialogElement>>('historialDialog');
   private readonly dialogRef = viewChild<ElementRef<HTMLDialogElement>>('productDialog');
+  private readonly folderDialogRef = viewChild<ElementRef<HTMLDialogElement>>('folderDialog');
+  private readonly moveDialogRef = viewChild<ElementRef<HTMLDialogElement>>('moveTargetDialog');
 
   protected readonly editingId = signal<number | null>(null);
   protected readonly dialogTitle = signal('Nuevo producto');
@@ -1659,6 +2068,15 @@ export class ProductosComponent {
   protected readonly saving = signal(false);
 
   private file: File | null = null;
+
+  protected readonly folderFormError = signal('');
+  protected readonly folderSaving = signal(false);
+  private folderFile: File | null = null;
+
+  protected readonly folderForm = this.fb.group({
+    nombre: this.fb.nonNullable.control('', Validators.required),
+    descripcion: this.fb.nonNullable.control(''),
+  });
 
   protected readonly form = this.fb.group({
     nombre: this.fb.nonNullable.control('', Validators.required),
@@ -1676,11 +2094,270 @@ export class ProductosComponent {
     return this.auth.currentUser()?.companyCurrency ?? 'EUR';
   }
 
+  ngOnInit(): void {
+    const raw = this.route.snapshot.queryParamMap.get('carpeta');
+    if (!raw) {
+      return;
+    }
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+    this.currentCarpetaId.set(id);
+    this.api.getCarpetasArbol().subscribe({
+      next: (tree) => {
+        const path = pathToFolder(tree, id);
+        if (path.length) {
+          this.breadcrumbs.set([{ id: null, nombre: 'Productos' }, ...path]);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  private syncQueryParam(): void {
+    const id = this.currentCarpetaId();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: id == null ? {} : { carpeta: id },
+      replaceUrl: true,
+    });
+  }
+
+  protected goBreadcrumb(index: number): void {
+    const crumbs = this.breadcrumbs().slice(0, index + 1);
+    this.breadcrumbs.set(crumbs);
+    const last = crumbs[crumbs.length - 1];
+    this.currentCarpetaId.set(last?.id ?? null);
+    this.folderMenuId.set(null);
+    this.refreshList();
+    this.syncQueryParam();
+  }
+
+  protected enterFolder(d: CarpetaArbolDto): void {
+    this.breadcrumbs.update((b) => [...b, { id: d.id, nombre: d.nombre }]);
+    this.currentCarpetaId.set(d.id);
+    this.folderMenuId.set(null);
+    this.refreshList();
+    this.syncQueryParam();
+  }
+
+  protected toggleFolderMenu(id: number, ev: Event): void {
+    ev.stopPropagation();
+    this.folderMenuId.update((cur) => (cur === id ? null : id));
+  }
+
+  protected openCreateFolder(): void {
+    if (!this.canManageFolders()) {
+      return;
+    }
+    this.folderForm.reset({ nombre: '', descripcion: '' });
+    this.folderFile = null;
+    this.folderFormError.set('');
+    queueMicrotask(() => this.folderDialogRef()?.nativeElement.showModal());
+  }
+
+  protected closeFolderDialog(): void {
+    this.folderDialogRef()?.nativeElement.close();
+  }
+
+  protected onFolderFile(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    this.folderFile = input.files?.[0] ?? null;
+  }
+
+  protected saveFolder(): void {
+    if (this.folderForm.invalid) {
+      return;
+    }
+    const v = this.folderForm.getRawValue();
+    const nombre = v.nombre.trim();
+    if (!nombre) {
+      return;
+    }
+    const parentId = this.currentCarpetaId();
+    this.folderFormError.set('');
+    this.folderSaving.set(true);
+    this.api
+      .crearCarpeta({
+        nombre,
+        descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
+        imagen: this.folderFile,
+        ...(parentId != null ? { parentId } : {}),
+      })
+      .subscribe({
+        next: () => {
+          this.folderSaving.set(false);
+          this.closeFolderDialog();
+          this.refreshList();
+        },
+        error: (err: { error?: { message?: string }; message?: string }) => {
+          this.folderSaving.set(false);
+          const msg = err?.error?.message ?? err?.message ?? 'No se pudo crear la carpeta';
+          this.folderFormError.set(typeof msg === 'string' ? msg : 'No se pudo crear la carpeta');
+        },
+      });
+  }
+
+  protected renameFolderPrompt(d: CarpetaArbolDto): void {
+    this.folderMenuId.set(null);
+    if (!this.canManageFolders()) {
+      return;
+    }
+    const nombre = globalThis.prompt('Nuevo nombre', d.nombre);
+    if (nombre == null) {
+      return;
+    }
+    const t = nombre.trim();
+    if (!t) {
+      return;
+    }
+    this.api.renombrarCarpeta(d.id, t).subscribe({
+      next: () => {
+        this.breadcrumbs.update((crumbs) =>
+          crumbs.map((c) => (c.id === d.id ? { ...c, nombre: t } : c)),
+        );
+        this.refreshList();
+      },
+      error: () => globalThis.alert('No se pudo renombrar'),
+    });
+  }
+
+  protected openMoveFolderDialog(d: CarpetaArbolDto): void {
+    this.folderMenuId.set(null);
+    if (!this.canManageFolders()) {
+      return;
+    }
+    this.pendingFolderMove = d;
+    this.pendingProductMove = null;
+    this.moveDialogTitle.set('Mover carpeta');
+    const tree = this.latestArbol();
+    const ex = collectCarpetaSubtreeIds(tree, d.id);
+    const opts = [
+      { id: null as number | null, label: 'Raíz (sin carpeta)' },
+      ...flattenCarpetaOptions(tree).filter((o) => !ex.has(o.id)),
+    ];
+    this.moveSelectOptions.set(opts);
+    queueMicrotask(() => this.moveDialogRef()?.nativeElement.showModal());
+  }
+
+  protected cloneFolderConfirm(d: CarpetaArbolDto): void {
+    this.folderMenuId.set(null);
+    if (!this.canManageFolders()) {
+      return;
+    }
+    if (!globalThis.confirm(`¿Clonar la carpeta "${d.nombre}" con todo su contenido?`)) {
+      return;
+    }
+    this.api.clonarCarpeta(d.id).subscribe({
+      next: () => this.refreshList(),
+      error: () => globalThis.alert('No se pudo clonar la carpeta'),
+    });
+  }
+
+  protected deleteFolderConfirm(d: CarpetaArbolDto): void {
+    this.folderMenuId.set(null);
+    if (!this.canDeleteProduct()) {
+      globalThis.alert('Tu rol no permite eliminar carpetas');
+      return;
+    }
+    if (
+      !globalThis.confirm(
+        'Se eliminarán todas las subcarpetas y todos los productos dentro de este árbol. ¿Continuar?',
+      )
+    ) {
+      return;
+    }
+    this.api.eliminarCarpeta(d.id).subscribe({
+      next: () => {
+        if (this.breadcrumbs().some((c) => c.id === d.id)) {
+          this.goBreadcrumb(0);
+        } else {
+          this.refreshList();
+        }
+      },
+      error: () => globalThis.alert('No se pudo eliminar la carpeta'),
+    });
+  }
+
+  protected cloneProductFromMenu(p: ProductoDto): void {
+    this.itemMenuId.set(null);
+    if (!this.canEmployeeCatalog()) {
+      return;
+    }
+    this.api.clonarProducto(p.id).subscribe({
+      next: () => this.refreshList(),
+      error: () => globalThis.alert('No se pudo clonar el producto'),
+    });
+  }
+
+  protected openMoveProductDialog(p: ProductoDto): void {
+    this.itemMenuId.set(null);
+    if (!this.canEmployeeCatalog()) {
+      return;
+    }
+    this.pendingProductMove = p;
+    this.pendingFolderMove = null;
+    this.moveDialogTitle.set('Mover producto');
+    const tree = this.latestArbol();
+    const opts = [
+      { id: null as number | null, label: 'Raíz (sin carpeta)' },
+      ...flattenCarpetaOptions(tree),
+    ];
+    this.moveSelectOptions.set(opts);
+    queueMicrotask(() => this.moveDialogRef()?.nativeElement.showModal());
+  }
+
+  protected closeMoveDialog(): void {
+    this.moveDialogRef()?.nativeElement.close();
+    this.pendingFolderMove = null;
+    this.pendingProductMove = null;
+  }
+
+  protected confirmMoveTarget(raw: string): void {
+    const carpetaDest = raw === '' ? null : Number(raw);
+    if (raw !== '' && !Number.isFinite(carpetaDest)) {
+      globalThis.alert('Selecciona una carpeta válida');
+      return;
+    }
+    const pf = this.pendingFolderMove;
+    const pp = this.pendingProductMove;
+    if (pf) {
+      this.api.moverCarpeta(pf.id, carpetaDest).subscribe({
+        next: () => {
+          this.closeMoveDialog();
+          this.refreshList();
+        },
+        error: () => globalThis.alert('No se pudo mover la carpeta'),
+      });
+      return;
+    }
+    if (pp) {
+      this.api.moverProductoCarpeta(pp.id, carpetaDest).subscribe({
+        next: () => {
+          this.closeMoveDialog();
+          this.refreshList();
+        },
+        error: () => globalThis.alert('No se pudo mover el producto'),
+      });
+    }
+  }
+
+  /** Empleado o administrador de empresa (no solo lectura). */
+  protected canEmployeeCatalog(): boolean {
+    const r = this.auth.currentUser()?.companyRole;
+    return r === 'company_admin' || r === 'employee';
+  }
+
+  protected canManageFolders(): boolean {
+    return this.canEmployeeCatalog();
+  }
+
   protected esStockBajo(p: ProductoDto): boolean {
     if (p.stockMinimo == null) {
       return false;
     }
-    return p.cantidad < p.stockMinimo;
+    return p.cantidad <= p.stockMinimo;
   }
 
   protected onSearch(ev: Event): void {
@@ -1751,6 +2428,8 @@ export class ProductosComponent {
         return `+${m.cantidad}`;
       case 'SALIDA':
         return `−${m.cantidad}`;
+      case 'AJUSTE':
+        return `→ ${m.cantidad}`;
       default:
         return String(m.cantidad);
     }
@@ -1836,6 +2515,11 @@ export class ProductosComponent {
     if (this.itemMenuId() !== null) {
       if (!el?.closest?.('.product-item-menu-root')) {
         this.itemMenuId.set(null);
+      }
+    }
+    if (this.folderMenuId() !== null) {
+      if (!el?.closest?.('.folder-item-menu-root')) {
+        this.folderMenuId.set(null);
       }
     }
   }
@@ -1948,7 +2632,8 @@ export class ProductosComponent {
       return;
     }
     const v = this.form.getRawValue();
-    const payload = {
+    const editing = this.editingId();
+    const payload: ProductoFormPayload = {
       nombre: v.nombre.trim(),
       cantidad: v.cantidad,
       precio: v.precio,
@@ -1956,11 +2641,13 @@ export class ProductosComponent {
       descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
       imagen: this.file,
     };
+    if (editing == null && this.currentCarpetaId() != null) {
+      payload.carpetaId = this.currentCarpetaId();
+    }
     this.formError.set('');
     this.saving.set(true);
-    const id = this.editingId();
     const req$ =
-      id == null ? this.api.createProducto(payload) : this.api.updateProducto(id, payload);
+      editing == null ? this.api.createProducto(payload) : this.api.updateProducto(editing, payload);
     req$.subscribe({
       next: () => {
         this.saving.set(false);

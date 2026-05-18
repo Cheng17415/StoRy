@@ -1,7 +1,7 @@
 <div class="app-shell">
 <header class="app-header">
   <a routerLink="/" class="brand">
-    <img class="brand-logo" src="/story-logo.png" width="40" height="40" alt="StoRy" />
+    <img class="brand-logo" src="/story-logo.svg" width="40" height="40" alt="StoRy" />
     <span class="brand-text">{{ title }}</span>
   </a>
   <nav>
@@ -10,6 +10,7 @@
       @if (puedeVerEstadisticas()) {
         <a routerLink="/estadisticas" routerLinkActive="active">Estadísticas</a>
       }
+      <a routerLink="/stock-bajo" routerLinkActive="active">Stock bajo</a>
       <a routerLink="/empresa" routerLinkActive="active">Empresa</a>
     }
   </nav>

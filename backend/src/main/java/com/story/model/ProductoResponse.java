@@ -16,6 +16,8 @@ public record ProductoResponse(
         Instant fechaActualizacion,
         String imagen,
         Long categoriaId,
-        String categoriaNombre
+        String categoriaNombre,
+        Long carpetaId,
+        String carpetaNombre
 ) {
 }

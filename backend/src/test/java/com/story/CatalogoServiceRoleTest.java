@@ -6,6 +6,7 @@ import com.story.model.CompanyRole;
 import com.story.model.Producto;
 import com.story.model.Usuario;
 import com.story.repository.CategoriaRepository;
+import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
 import com.story.service.CatalogoService;
 import com.story.service.CurrentUserService;
@@ -39,6 +40,8 @@ class CatalogoServiceRoleTest {
     private CategoriaRepository categoriaRepository;
     @Mock
     private ProductoRepository productoRepository;
+    @Mock
+    private ProductoCarpetaRepository productoCarpetaRepository;
     @Mock
     private FileStorageService fileStorageService;
     @Mock
@@ -87,6 +90,7 @@ class CatalogoServiceRoleTest {
                 new BigDecimal("99.99"),
                 "12",
                 "Nueva descripcion",
+                null,
                 null
         );
 

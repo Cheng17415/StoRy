@@ -13,11 +13,30 @@ export class AuthService {
   private readonly token = signal<string | null>(this.readToken());
   private readonly user = signal<AuthUserDto | null>(this.readUser());
 
-  readonly loggedIn = computed(() => this.token() !== null && this.token()!.length > 0);
+  readonly loggedIn = computed(() => {
+    const t = this.token()?.trim();
+    return t != null && t.length > 0;
+  });
   readonly currentUser = computed(() => this.user());
 
   getToken(): string | null {
-    return this.token();
+    const norm = (raw: string | null): string | null => {
+      if (raw == null) {
+        return null;
+      }
+      const t = raw.trim();
+      return t.length > 0 ? t : null;
+    };
+    const cached = norm(this.token());
+    if (cached) {
+      return cached;
+    }
+    const fromStorage = norm(sessionStorage.getItem(TOKEN_KEY));
+    if (fromStorage) {
+      this.token.set(fromStorage);
+      return fromStorage;
+    }
+    return null;
   }
 
   /** Actualiza el usuario en memoria y sessionStorage (p. ej. tras editar perfil). */
@@ -46,14 +65,16 @@ export class AuthService {
   }
 
   private persist(r: AuthResponse): void {
-    sessionStorage.setItem(TOKEN_KEY, r.accessToken);
+    const access = r.accessToken?.trim() ?? '';
+    sessionStorage.setItem(TOKEN_KEY, access);
     sessionStorage.setItem(USER_KEY, JSON.stringify(r.user));
-    this.token.set(r.accessToken);
+    this.token.set(access.length > 0 ? access : null);
     this.user.set(r.user);
   }
 
   private readToken(): string | null {
-    return sessionStorage.getItem(TOKEN_KEY);
+    const raw = sessionStorage.getItem(TOKEN_KEY)?.trim();
+    return raw && raw.length > 0 ? raw : null;
   }
 
   private readUser(): AuthUserDto | null {

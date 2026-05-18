@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/account/**").authenticated()
                         .requestMatchers("/api/company/**").authenticated()
                         .requestMatchers("/api/productos/**").authenticated()
+                        .requestMatchers("/api/carpetas", "/api/carpetas/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -33,6 +33,10 @@ export const routes: Routes = [
     canActivate: [estadisticasGuard],
     loadComponent: () =>
       import('./features/inventario/estadisticas.component').then((m) => m.EstadisticasComponent),
+    path: 'stock-bajo',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/catalogo/stock-bajo-minimo.component').then((m) => m.StockBajoMinimoComponent),
   },
   {
     path: 'producto/:id',

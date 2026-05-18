@@ -13,7 +13,11 @@ function requestPathname(url: string): string {
     return '';
   }
   try {
-    return new URL(raw, 'http://localhost').pathname;
+    let pathname = new URL(raw, 'http://localhost').pathname;
+    while (pathname.startsWith('//')) {
+      pathname = pathname.slice(1);
+    }
+    return pathname;
   } catch {
     const pathStr = raw.startsWith('/') ? raw : `/${raw}`;
     return pathStr.split(/[?#]/)[0];
@@ -25,17 +29,26 @@ function isPublicAuthPath(pathname: string): boolean {
 }
 
 function needsBearerForPath(pathname: string): boolean {
-  return pathname.startsWith('/api') && !isPublicAuthPath(pathname);
+  let p = pathname.trim();
+  while (p.startsWith('//')) {
+    p = p.slice(1);
+  }
+  if (!p.startsWith('/')) {
+    p = `/${p}`;
+  }
+  if (isPublicAuthPath(p)) {
+    return false;
+  }
+  return p.startsWith('/api/') || p === '/api';
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const token = auth.getToken();
   const pathname = requestPathname(req.url);
-  if (token && needsBearerForPath(pathname)) {
-    req = req.clone({
-      setHeaders: { Authorization: `Bearer ${token}` },
-    });
+  if (!token || !needsBearerForPath(pathname)) {
+    return next(req);
   }
-  return next(req);
+  /** Siempre fijar Bearer (sobreescribe cabeceras vacías/erróneas). `headers.set` no rompe multipart/boundary. */
+  return next(req.clone({ headers: req.headers.set('Authorization', `Bearer ${token}`) }));
 };
