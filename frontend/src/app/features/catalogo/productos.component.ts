@@ -193,23 +193,45 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         </aside>
         <div class="productos-main">
           <header class="page-head">
-        <h1 class="page-title">Todos los productos</h1>
+        <div class="page-head-text">
+          <h1 class="page-title">Productos</h1>
+          <p class="page-sub">Tu catálogo y carpetas, todo a mano.</p>
+        </div>
         <div class="page-head-actions">
           @if (canManageFolders()) {
-            <button type="button" class="btn-secondary-header" (click)="openCreateFolder()">Nueva carpeta</button>
+            <button type="button" class="btn-secondary-header" (click)="openCreateFolder()">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2zM12 11v6M9 14h6" />
+              </svg>
+              Nueva carpeta
+            </button>
           }
           @if (canCreateProduct()) {
-            <button type="button" class="btn-cta" (click)="openCreate()">Añadir producto</button>
+            <button type="button" class="btn-cta" (click)="openCreate()">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+              Añadir producto
+            </button>
           }
         </div>
       </header>
 
       <nav class="folder-bc" aria-label="Ubicación">
+        <span class="folder-bc-home" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-8 9 8M5 10v10h14V10" />
+          </svg>
+        </span>
         @for (crumb of breadcrumbs(); track idx; let idx = $index) {
           @if (idx > 0) {
-            <span class="folder-bc-sep" aria-hidden="true">/</span>
+            <span class="folder-bc-sep" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="12" height="12">
+                <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6" />
+              </svg>
+            </span>
           }
-          <button type="button" class="folder-bc-link" (click)="goBreadcrumb(idx)">{{ crumb.nombre }}</button>
+          <button type="button" class="folder-bc-link" [class.folder-bc-link--current]="idx === breadcrumbs().length - 1" (click)="goBreadcrumb(idx)">{{ crumb.nombre }}</button>
         }
       </nav>
 
@@ -230,94 +252,62 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           />
         </div>
         <label class="cat-filter">
-          <span class="cat-filter-label">Categoría</span>
+          <span class="cat-filter-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            </svg>
+          </span>
           <select
             class="cat-filter-select"
             [value]="categoriaFiltro() != null ? '' + categoriaFiltro() : ''"
             (change)="onCategoriaFiltroChange($event)"
+            aria-label="Filtrar por categoría"
           >
-            <option value="">Todas</option>
+            <option value="">Todas las categorías</option>
             @for (c of categorias(); track c.id) {
               <option [value]="'' + c.id">{{ c.nombre }}</option>
             }
           </select>
         </label>
         <div class="toolbar-right">
-          <div class="layout-dropdown" #layoutDropdown>
-            <button
-              type="button"
-              class="layout-trigger"
-              [attr.aria-expanded]="layoutMenuOpen()"
-              aria-haspopup="listbox"
-              [attr.aria-label]="'Tipo de vista: ' + layoutLabel()"
-              (click)="toggleLayoutMenu($event)"
-            >
-              @switch (layoutMode()) {
-                @case ('grid') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                  </svg>
+          <div class="layout-segmented" role="tablist" aria-label="Tipo de vista" #layoutDropdown>
+            @for (opt of layoutOptions; track opt.mode) {
+              <button
+                type="button"
+                class="layout-seg-btn"
+                role="tab"
+                [class.active]="layoutMode() === opt.mode"
+                [attr.aria-selected]="layoutMode() === opt.mode"
+                [attr.aria-label]="opt.label"
+                [title]="opt.label"
+                (click)="selectLayout(opt.mode)"
+              >
+                @switch (opt.mode) {
+                  @case ('grid') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+                    </svg>
+                  }
+                  @case ('list') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="5" rx="1.5" fill="currentColor" />
+                      <rect x="3" y="14" width="18" height="5" rx="1.5" fill="currentColor" />
+                    </svg>
+                  }
+                  @case ('table') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                      <rect x="3" y="10.25" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                      <rect x="3" y="16.5" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                    </svg>
+                  }
                 }
-                @case ('list') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="5" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="18" height="5" rx="1" fill="currentColor" />
-                  </svg>
-                }
-                @case ('table') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="4" width="18" height="4" rx="0.5" fill="currentColor" />
-                    <rect x="3" y="10" width="18" height="4" rx="0.5" fill="currentColor" />
-                    <rect x="3" y="16" width="18" height="4" rx="0.5" fill="currentColor" />
-                  </svg>
-                }
-              }
-            </button>
-            @if (layoutMenuOpen()) {
-              <div class="layout-panel" role="listbox">
-                <div class="layout-panel-title">Tipo de vista</div>
-                @for (opt of layoutOptions; track opt.mode) {
-                  <button
-                    type="button"
-                    class="layout-option"
-                    role="option"
-                    [class.active]="layoutMode() === opt.mode"
-                    [attr.aria-selected]="layoutMode() === opt.mode"
-                    (click)="selectLayout(opt.mode); $event.stopPropagation()"
-                  >
-                    @switch (opt.mode) {
-                      @case ('grid') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="14" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="3" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="14" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                        </svg>
-                      }
-                      @case ('list') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="5" width="18" height="5" rx="1" fill="currentColor" />
-                          <rect x="3" y="14" width="18" height="5" rx="1" fill="currentColor" />
-                        </svg>
-                      }
-                      @case ('table') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="4" width="18" height="4" rx="0.5" fill="currentColor" />
-                          <rect x="3" y="10" width="18" height="4" rx="0.5" fill="currentColor" />
-                          <rect x="3" y="16" width="18" height="4" rx="0.5" fill="currentColor" />
-                        </svg>
-                      }
-                    }
-                    <span class="layout-option-label">{{ opt.label }}</span>
-                  </button>
-                }
-              </div>
+              </button>
             }
           </div>
-          <span class="sort-toolbar-label">Ordenar</span>
           <div class="sort-dropdown" #sortDropdown>
             <button
               type="button"
@@ -326,8 +316,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               aria-haspopup="listbox"
               (click)="toggleSortMenu($event)"
             >
+              <svg class="sort-trigger-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 6h13M3 12h9M3 18h5M17 4v16M17 20l3-3M17 20l-3-3" />
+              </svg>
               <span class="sort-trigger-main">{{ sortTriggerText() }}</span>
-              <span class="sort-trigger-chev" aria-hidden="true">▾</span>
+              <svg class="sort-trigger-chev" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+              </svg>
             </button>
             @if (sortMenuOpen()) {
               <div class="sort-panel" role="listbox">
@@ -427,16 +422,37 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             }
             <section class="stats-bar" aria-label="Resumen">
               <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
               </div>
             </section>
             @if (vm.pageData.items.length > 0) {
@@ -584,16 +600,37 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             }
             <section class="stats-bar" aria-label="Resumen">
               <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
               </div>
             </section>
             @if (vm.pageData.items.length > 0) {
@@ -676,16 +713,37 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           @case ('table') {
             <section class="stats-bar" aria-label="Resumen">
               <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
               </div>
             </section>
             @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
@@ -1151,19 +1209,32 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .page-head {
       display: flex;
-      align-items: flex-start;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 1rem;
       flex-wrap: wrap;
-      margin-bottom: 1.25rem;
+      margin: 0.25rem 0 1.25rem;
+    }
+
+    .page-head-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
     }
 
     .page-title {
       margin: 0;
-      font-size: clamp(1.5rem, 3vw, 1.95rem);
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
       font-weight: 700;
-      letter-spacing: -0.025em;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
       color: var(--inv-text);
+    }
+
+    .page-sub {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--inv-muted);
     }
 
     .page-head-actions {
@@ -1177,21 +1248,33 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.6rem 1.1rem;
+      gap: 0.4rem;
+      height: 2.5rem;
+      padding: 0 0.95rem;
       border-radius: 10px;
       border: 1px solid var(--inv-border-strong);
       background: var(--inv-surface);
-      font-size: 0.85rem;
+      font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
       color: var(--inv-text-soft);
-      transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+      transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-secondary-header svg {
+      color: var(--inv-muted);
+      transition: color 0.18s ease;
     }
 
     .btn-secondary-header:hover {
       border-color: var(--inv-cta);
       color: var(--inv-cta);
       background: #ffffff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+
+    .btn-secondary-header:hover svg {
+      color: var(--inv-cta);
     }
 
     .btn-secondary-header:focus-visible {
@@ -1203,29 +1286,53 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.35rem;
-      margin: 0 0 1rem;
-      font-size: 0.9rem;
+      gap: 0.4rem;
+      margin: 0 0 1.1rem;
+      padding: 0.55rem 0.85rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      box-shadow: var(--inv-shadow);
+    }
+
+    .folder-bc-home {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--inv-muted);
+      margin-right: 0.1rem;
     }
 
     .folder-bc-link {
       border: none;
       background: none;
-      padding: 0;
+      padding: 0.2rem 0.45rem;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
       font: inherit;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .folder-bc-link:hover {
       color: var(--inv-cta);
+      background: rgba(30, 64, 175, 0.06);
+    }
+
+    .folder-bc-link--current {
+      color: var(--inv-text);
+      font-weight: 700;
+      cursor: default;
     }
 
     .folder-bc-sep {
-      color: var(--inv-muted);
+      display: inline-flex;
+      align-items: center;
+      color: #cbd5e1;
       user-select: none;
     }
 
@@ -1315,19 +1422,24 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
-      padding: 0.6rem 1.15rem;
+      gap: 0.45rem;
+      height: 2.5rem;
+      padding: 0 1.05rem;
       border: 1px solid var(--inv-cta);
       border-radius: 10px;
-      background: var(--inv-cta);
+      background: linear-gradient(180deg, var(--story-secondary) 0%, var(--inv-cta) 100%);
       color: #ffffff;
       font-size: 0.88rem;
       font-weight: 600;
       letter-spacing: 0;
       text-transform: none;
       cursor: pointer;
-      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.25);
+      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.05s ease;
+      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.28);
+    }
+
+    .btn-cta:active {
+      transform: translateY(1px);
     }
 
     .btn-cta:hover {
@@ -1345,16 +1457,20 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1rem;
+      gap: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      padding: 0.75rem 0.85rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 14px;
+      box-shadow: var(--inv-shadow);
     }
 
     .search-wrap {
       position: relative;
-      flex: 1;
-      min-width: 200px;
-      max-width: 28rem;
+      flex: 1 1 18rem;
+      min-width: 14rem;
+      max-width: 26rem;
     }
 
     .search-icon {
@@ -1374,9 +1490,10 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .search-input {
       width: 100%;
-      padding: 0.65rem 0.95rem 0.65rem 2.5rem;
+      height: 2.5rem;
+      padding: 0 0.95rem 0 2.5rem;
       border: 1px solid var(--inv-border-strong);
-      border-radius: 999px;
+      border-radius: 10px;
       background: var(--inv-surface);
       font-size: 0.92rem;
       color: var(--inv-text);
@@ -1398,29 +1515,44 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .cat-filter {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      min-width: 10rem;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-width: 12rem;
     }
 
-    .cat-filter-label {
-      font-size: 0.72rem;
-      font-weight: 700;
+    .cat-filter-icon {
+      position: absolute;
+      left: 0.7rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
       color: var(--inv-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      pointer-events: none;
+      transition: color 0.18s ease;
+    }
+
+    .cat-filter:focus-within .cat-filter-icon {
+      color: var(--inv-cta);
     }
 
     .cat-filter-select {
-      padding: 0.6rem 0.8rem;
+      width: 100%;
+      height: 2.5rem;
+      padding: 0 2.25rem 0 2.35rem;
       border: 1px solid var(--inv-border-strong);
       border-radius: 10px;
       background: var(--inv-surface);
       font: inherit;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--inv-text);
       cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.65rem center;
+      background-size: 14px;
       transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
 
@@ -1437,14 +1569,9 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .toolbar-right {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.6rem;
+      margin-left: auto;
       position: relative;
-    }
-
-    .sort-toolbar-label {
-      font-size: 0.85rem;
-      color: var(--inv-muted);
-      font-weight: 500;
     }
 
     .sort-dropdown {
@@ -1454,21 +1581,27 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .sort-trigger {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.55rem 0.75rem 0.55rem 0.9rem;
+      gap: 0.5rem;
+      height: 2.5rem;
+      padding: 0 0.65rem 0 0.85rem;
       border: 1px solid var(--inv-border-strong);
       border-radius: 10px;
       background: var(--inv-surface);
       font-size: 0.88rem;
       cursor: pointer;
       color: var(--inv-text-soft);
-      min-width: 12rem;
-      justify-content: space-between;
-      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+      min-width: 12.5rem;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
     }
 
     .sort-trigger:hover {
       border-color: var(--inv-cta);
+      color: var(--inv-text);
+    }
+
+    .sort-trigger:hover .sort-trigger-icon,
+    .sort-trigger[aria-expanded='true'] .sort-trigger-icon {
+      color: var(--inv-cta);
     }
 
     .sort-trigger:focus-visible {
@@ -1476,15 +1609,26 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       box-shadow: var(--inv-focus-ring);
     }
 
+    .sort-trigger-icon {
+      color: var(--inv-muted);
+      flex-shrink: 0;
+      transition: color 0.18s ease;
+    }
+
     .sort-trigger-main {
+      flex: 1;
       font-weight: 500;
       text-align: left;
     }
 
     .sort-trigger-chev {
       color: var(--inv-muted);
-      font-size: 0.65rem;
-      line-height: 1;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .sort-trigger[aria-expanded='true'] .sort-trigger-chev {
+      transform: rotate(180deg);
     }
 
     .sort-panel {
@@ -1537,121 +1681,105 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       color: var(--inv-cta);
     }
 
-    .layout-dropdown {
-      position: relative;
+    .layout-segmented {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      height: 2.5rem;
+      background: #f1f5f9;
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
     }
 
-    .layout-trigger {
+    .layout-seg-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 2.1rem;
+      height: 100%;
       padding: 0;
-      border: 1px solid var(--inv-border-strong);
-      border-radius: 10px;
-      background: var(--inv-surface);
-      color: var(--inv-text-soft);
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--inv-muted);
       cursor: pointer;
-      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
     }
 
-    .layout-trigger:hover {
-      border-color: var(--inv-cta);
+    .layout-seg-btn:hover {
+      color: var(--inv-text);
+    }
+
+    .layout-seg-btn.active {
+      background: var(--inv-surface);
       color: var(--inv-cta);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06);
     }
 
-    .layout-trigger:focus-visible {
+    .layout-seg-btn:focus-visible {
       outline: none;
       box-shadow: var(--inv-focus-ring);
     }
 
-    .layout-trigger-icon {
-      width: 1.25rem;
-      height: 1.25rem;
-      display: block;
-    }
-
-    .layout-panel {
-      position: absolute;
-      right: 0;
-      top: calc(100% + 6px);
-      min-width: 12.5rem;
-      padding: 0.5rem 0.4rem 0.4rem;
-      background: var(--inv-surface);
-      border: 1px solid var(--inv-border);
-      border-radius: 12px;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
-      z-index: 25;
-    }
-
-    .layout-panel-title {
-      padding: 0 0.85rem 0.4rem;
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #9ca3af;
-    }
-
-    .layout-option {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      width: 100%;
-      padding: 0.55rem 0.75rem;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      font-size: 0.9rem;
-      cursor: pointer;
-      color: var(--inv-text-soft);
-      text-align: left;
-      transition: background 0.12s ease;
-    }
-
-    .layout-option:hover {
-      background: #f1f5f9;
-    }
-
-    .layout-option.active {
-      background: rgba(30, 64, 175, 0.08);
-      color: var(--inv-cta);
-      font-weight: 600;
-    }
-
-    .layout-option-icon {
-      flex-shrink: 0;
-      width: 1.15rem;
-      height: 1.15rem;
-      color: #9ca3af;
-    }
-
-    .layout-option.active .layout-option-icon {
-      color: var(--inv-cta);
-    }
-
-    .layout-option-label {
-      flex: 1;
-    }
-
     .stats-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.5rem 2.5rem;
-      padding: 0.85rem 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+      gap: 0.75rem;
       margin-bottom: 1.25rem;
-      border-bottom: 1px solid var(--inv-border);
     }
 
     .stat {
       display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.85rem 1rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 12px;
+      box-shadow: var(--inv-shadow);
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .stat:hover {
+      border-color: var(--inv-border-strong);
+      transform: translateY(-1px);
+    }
+
+    .stat-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon--blue {
+      background: rgba(30, 64, 175, 0.10);
+      color: var(--inv-cta);
+    }
+
+    .stat-icon--amber {
+      background: rgba(245, 158, 11, 0.14);
+      color: #d97706;
+    }
+
+    .stat-icon--green {
+      background: rgba(21, 128, 61, 0.10);
+      color: var(--story-success);
+    }
+
+    .stat-body {
+      display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      gap: 0.1rem;
+      min-width: 0;
     }
 
     .stat-label {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -1659,10 +1787,10 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .stat-value {
-      font-size: 1.15rem;
+      font-size: 1.2rem;
       font-weight: 700;
       color: var(--inv-text);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.015em;
     }
 
     .loading,
