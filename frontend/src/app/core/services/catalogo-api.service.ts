@@ -42,6 +42,11 @@ export interface ProductoFormPayload {
   carpetaId?: number | null;
 }
 
+export interface CategoriaFormPayload {
+  nombre: string;
+  descripcion?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CatalogoApiService {
   private readonly http = inject(HttpClient);
@@ -57,16 +62,32 @@ export class CatalogoApiService {
   }
 
   getCategorias(): Observable<CategoriaDto[]> {
-    return this.http.get<CategoriaDto[]>('/api/categorias');
+    return this.http.get<CategoriaDto[]>('/api/categorias', this.authBearerOpts());
+  }
+
+  createCategoria(payload: CategoriaFormPayload): Observable<CategoriaDto> {
+    return this.http.post<CategoriaDto>(
+      '/api/categorias',
+      { nombre: payload.nombre, descripcion: payload.descripcion ?? '' },
+      this.authBearerOpts(),
+    );
   }
 
   /** Lista productos en la carpeta dada; {@code null} = sin carpeta (raíz). */
-  getProductos(carpetaId?: number | null): Observable<ProductoDto[]> {
+  getProductos(carpetaId?: number | null, categoriaId?: number | null): Observable<ProductoDto[]> {
     let params = new HttpParams();
     if (carpetaId != null) {
       params = params.set('carpetaId', String(carpetaId));
     }
+    if (categoriaId != null && categoriaId > 0) {
+      params = params.set('categoriaId', String(categoriaId));
+    }
     return this.http.get<ProductoDto[]>('/api/productos', { params, ...this.authBearerOpts() });
+  }
+
+  /** Todos los productos de la empresa (cualquier carpeta). */
+  getTodosProductosEmpresa(): Observable<ProductoDto[]> {
+    return this.http.get<ProductoDto[]>('/api/productos/todos', this.authBearerOpts());
   }
 
   getCarpetasArbol(): Observable<CarpetaArbolDto[]> {
@@ -127,11 +148,11 @@ export class CatalogoApiService {
   }
 
   getProductosBajoMinimo(categoriaId?: number | null): Observable<ProductoDto[]> {
-    let params = new HttpParams();
+    let params = new HttpParams().set('bajoMinimo', 'true');
     if (categoriaId != null && categoriaId > 0) {
       params = params.set('categoriaId', String(categoriaId));
     }
-    return this.http.get<ProductoDto[]>('/api/productos/bajo-minimo', {
+    return this.http.get<ProductoDto[]>('/api/productos', {
       params,
       ...this.authBearerOpts(),
     });
@@ -156,9 +177,18 @@ export class CatalogoApiService {
     return this.http.get<MovimientoStockDto[]>(`/api/productos/${id}/movimientos`, this.authBearerOpts());
   }
 
-  getInventarioEstadisticas(desde: string, hasta: string): Observable<InventarioEstadisticasDto> {
+  getInventarioEstadisticas(
+    desde: string,
+    hasta: string,
+    categoriaId?: number | null,
+  ): Observable<InventarioEstadisticasDto> {
+    let params = new HttpParams().set('desde', desde).set('hasta', hasta);
+    if (categoriaId != null && categoriaId > 0) {
+      params = params.set('categoriaId', String(categoriaId));
+    }
     return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
-      params: { desde, hasta },
+      params,
+      ...this.authBearerOpts(),
     });
   }
 
@@ -198,6 +228,24 @@ export class CatalogoApiService {
     return this.http.patch<ProductoDto>(
       `/api/productos/${productoId}/carpeta`,
       { carpetaId },
+      this.authBearerOpts(),
+    );
+  }
+
+  agregarProductoCategoria(
+    productoId: number,
+    payload: { categoriaId?: number; nombre?: string },
+  ): Observable<ProductoDto> {
+    return this.http.post<ProductoDto>(
+      `/api/productos/${productoId}/categorias`,
+      payload,
+      this.authBearerOpts(),
+    );
+  }
+
+  quitarProductoCategoria(productoId: number, categoriaId: number): Observable<ProductoDto> {
+    return this.http.delete<ProductoDto>(
+      `/api/productos/${productoId}/categorias/${categoriaId}`,
       this.authBearerOpts(),
     );
   }

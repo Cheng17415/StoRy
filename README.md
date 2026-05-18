@@ -97,6 +97,6 @@ Build de producción: `cd frontend && npm run build`.
 
 ## Esquema de datos
 
-Ver [estructura.txt](estructura.txt) (modelo PostgreSQL: usuarios, perfiles, categorías, productos, movimientos de stock).
+Ver [estructura.txt](estructura.txt) y [documentacion/StoRy-guia-tecnica.md](documentacion/StoRy-guia-tecnica.md) (modelo PostgreSQL e inventario multi-empresa).
 
 Los scripts en `scripts/postgres/` son históricos (entorno local); el entorno oficial es Supabase + Flyway.

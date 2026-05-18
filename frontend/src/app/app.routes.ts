@@ -10,6 +10,7 @@ export const routes: Routes = [
   },
   {
     path: 'categorias',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/catalogo/categorias.component').then((m) => m.CategoriasComponent),
   },

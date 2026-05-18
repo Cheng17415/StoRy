@@ -12,7 +12,7 @@ Hola. Este documento resume cómo está montado **StoRy** a nivel de base de dat
 | **Backend** | Spring Boot 3.5 (Java 17) | API REST, seguridad, lógica de negocio |
 | **Base de datos** | PostgreSQL en **Supabase** | Datos persistentes (usuarios, productos, empresas…) |
 | **ORM** | Spring Data JPA / Hibernate | Mapear tablas ↔ clases Java |
-| **Migraciones** | Flyway | Versionar el esquema SQL (`V1`…`V8`) |
+| **Migraciones** | Flyway | Versionar el esquema SQL (`V1`…`V10`) |
 | **Auth** | JWT (JSON Web Token) | Sesión stateless tras login/registro |
 | **Contraseñas** | BCrypt | Hashear passwords locales |
 | **Google** | Google Identity (ID token) | Login/registro con cuenta Google |
@@ -32,8 +32,6 @@ La app es **multi-empresa**: casi todo el inventario cuelga de una `company`. Un
 
 ```mermaid
 erDiagram
-    USUARIO ||--o{ USUARIO_PERFIL : tiene
-    PERFIL ||--o{ USUARIO_PERFIL : asigna
     USUARIO ||--o{ COMPANY_MEMBER : pertenece
     COMPANY ||--o{ COMPANY_MEMBER : miembros
     USUARIO ||--o{ MOVIMIENTO_STOCK : registra
@@ -43,6 +41,7 @@ erDiagram
     COMPANY ||--o{ COMPANY_INVITATION : invitaciones
     COMPANY ||--o{ PRODUCTO : catalogo
     COMPANY ||--o{ PRODUCTO_CARPETA : carpetas
+    COMPANY ||--o{ CATEGORIA : categorias
 
     CATEGORIA ||--o{ PRODUCTO : clasifica
 
@@ -63,16 +62,6 @@ erDiagram
         string google_provider_id
         timestamptz fecha_registro
         timestamptz fecha_ultimo_login
-    }
-
-    PERFIL {
-        bigint id PK
-        string perfil UK
-    }
-
-    USUARIO_PERFIL {
-        bigint id_usuario PK,FK
-        bigint id_perfil PK,FK
     }
 
     COMPANY {
@@ -107,6 +96,7 @@ erDiagram
 
     CATEGORIA {
         bigint id PK
+        bigint company_id FK
         string nombre
         text descripcion
     }
@@ -149,28 +139,27 @@ erDiagram
     }
 ```
 
-> **Nota:** `perfil` / `usuario_perfil` existen en la BD (modelo clásico usuario–rol), pero la autorización **real** en la app va por **rol de empresa** (`company_member.role`), no por esas tablas.
+> **Nota:** los roles de la app van por **empresa** (`company_member.role`: `company_admin`, `employee`, `analytics_viewer`), no por tablas de perfil genérico.
 
 ### 2.2 Qué hace cada tabla (en cristiano)
 
 | Tabla | Qué guarda |
 |-------|------------|
 | **usuario** | Personas que entran en StoRy. Pueden ser `LOCAL` (email + password) o `GOOGLE`. Estados: `ACTIVO`, `BLOQUEADO`, `ELIMINADO`. |
-| **perfil** | Catálogo de perfiles genéricos (p. ej. “ADMIN”). Tabla preparada para el futuro. |
-| **usuario_perfil** | Relación N:M usuario ↔ perfil. |
 | **company** | Empresa / organización. Tiene nombre único, moneda (`EUR`, `USD`, `JPY`, `CNY`) y **contraseña de empresa** (hash) para que otros se unan. |
 | **company_member** | Quién está en qué empresa y con qué **rol**. Un usuario = una fila como máximo. |
 | **company_invitation** | Invitación por email con token, rol asignado y caducidad (7 días). |
-| **categoria** | Etiquetas opcionales para productos. |
+| **categoria** | Etiquetas opcionales para productos, **por empresa**. El nombre es único dentro de la misma empresa (`company_id` + `nombre`). |
 | **producto** | Artículo de inventario. Código único **por empresa** (`company_id` + `codigo`). Pertenece a un usuario creador y a una empresa. |
 | **producto_carpeta** | Carpetas tipo árbol dentro de una empresa (pueden anidarse con `parent_id`). |
 | **movimiento_stock** | Historial: cada entrada, salida o ajuste de stock, con usuario y fecha. |
 
 ### 2.3 Reglas importantes de integridad
 
-- Si borras una **empresa**, en cascada se van miembros, invitaciones y carpetas.
+- Si borras una **empresa**, en cascada se van miembros, invitaciones, carpetas y **categorías**.
 - Un **producto** no puede quedarse huérfano de empresa (`company_id` obligatorio).
 - El **código** de producto es único dentro de la misma empresa, no en todo el mundo.
+- Una **categoría** pertenece a una sola empresa; un producto solo puede tener categorías de su misma empresa (`categoria_id` opcional, `NULL` = sin categoría).
 - **movimiento_stock** se borra si se borra el producto (`ON DELETE CASCADE`).
 - Una carpeta con productos dentro no se borra a la ligera (`carpeta_id` en producto con `RESTRICT`); el admin borra la carpeta y la app elimina productos del subárbol.
 
@@ -178,7 +167,7 @@ erDiagram
 
 ## 3. Roles de empresa (lo que importa de verdad)
 
-No confundir con `perfil` de la BD. En el día a día usamos **`CompanyRole`**:
+En el día a día usamos **`CompanyRole`** (tabla `company_member`):
 
 | Rol | Nombre en BD | En la práctica |
 |-----|--------------|----------------|
@@ -196,6 +185,7 @@ flowchart TB
         A3["Invitar miembros"]
         A4["Estadisticas"]
         A5["Movimientos de stock"]
+        A6["Crear categorias y asignarlas a productos"]
     end
 
     subgraph emp["employee"]
@@ -203,6 +193,7 @@ flowchart TB
         E2["Editar producto: solo cantidad"]
         E3["Movimientos de stock"]
         E4["Clonar productos y carpetas"]
+        E5["Crear categorias y asignarlas a productos"]
     end
 
     subgraph ana["analytics_viewer"]
@@ -326,7 +317,7 @@ sequenceDiagram
     API->>API: CurrentUserService obtiene empresa y rol
 ```
 
-Rutas del frontend con `authGuard` (productos, perfil, empresa…) exigen token válido. **Estadísticas** usa `estadisticasGuard` (admin o analítica).
+Rutas del frontend con `authGuard` (productos, perfil, empresa, categorías…) exigen token válido. **Estadísticas** usa `estadisticasGuard` (admin o analítica). En el backend, `/api/categorias` también exige autenticación (ya no es pública).
 
 ---
 
@@ -336,22 +327,67 @@ Rutas del frontend con `authGuard` (productos, perfil, empresa…) exigen token 
 flowchart TD
     subgraph empresa ["Por empresa"]
         PC["producto_carpeta arbol"]
+        CAT["categoria"]
         PR["producto"]
         MS["movimiento_stock"]
     end
 
     PC --> PR
+    CAT -. opcional .-> PR
     PR --> MS
     U["usuario"] --> MS
     U --> PR
     CO["company"] --> PR
     CO --> PC
-    CAT["categoria"] -. opcional .-> PR
+    CO --> CAT
 ```
 
 - Al **crear** un producto con cantidad inicial, se suele generar un movimiento `ENTRADA` (“Stock inicial”).
 - Al **editar** cantidad, se registran entradas/salidas/ajustes según la diferencia.
 - Tipos de movimiento: `ENTRADA`, `SALIDA`, `AJUSTE`.
+
+### 5.1 Categorías y productos
+
+Las categorías son **etiquetas opcionales** por empresa. Un producto puede tener **cero o una** categoría (`producto.categoria_id`).
+
+**Migración:** `V10__categoria_company.sql` añade `company_id` a `categoria`, índice por empresa y unicidad `(company_id, nombre)`. Las categorías globales anteriores a multi-tenant se eliminaron en esa migración.
+
+**API (requieren JWT):**
+
+| Método | Ruta | Quién | Qué hace |
+|--------|------|-------|----------|
+| `GET` | `/api/categorias` | autenticado | Lista categorías de la empresa actual |
+| `POST` | `/api/categorias` | `employee`+ | Crea categoría (`nombre`, `descripcion` opcional). Duplicado → `409` |
+| `PATCH` | `/api/productos/{id}/categoria` | `employee`+ | Asigna o quita categoría (`{ "categoriaId": number \| null }`) |
+| `GET` | `/api/productos?carpetaId=&categoriaId=` | autenticado | Lista productos filtrados por carpeta y/o categoría |
+| `GET` | `/api/productos/bajo-minimo?categoriaId=` | autenticado | Stock bajo mínimo, filtro opcional por categoría |
+| `GET` | `/api/productos/estadisticas?desde=&hasta=&categoriaId=` | admin o analítica | KPIs y series solo de movimientos de productos de esa categoría |
+
+**Frontend:**
+
+| Ruta | Comportamiento |
+|------|----------------|
+| `/producto/:id` | Sección **Categoría**: selector, crear inline, quitar. Cambios inmediatos vía `PATCH` (no dependen del modo editar del resto de campos). |
+| `/productos` | `<select>` de categoría en la barra de herramientas; recarga el listado con `categoriaId`. |
+| `/estadisticas` | Filtro de categoría junto al rango de fechas. |
+| `/categorias` | Listado de consulta (requiere login). |
+
+```mermaid
+sequenceDiagram
+    participant UI as ProductoDetalle
+    participant API as CatalogoApiService
+    participant BE as CatalogoService
+    participant DB as Postgres
+
+    UI->>API: createCategoria("Alimentacion")
+    API->>BE: POST /api/categorias
+    BE->>DB: INSERT categoria(company_id, nombre)
+    UI->>API: asignarProductoCategoria(id, catId)
+    API->>BE: PATCH /api/productos/id/categoria
+    BE->>DB: UPDATE producto SET categoria_id
+```
+
+**Fuera de alcance actual:** editar/eliminar categorías desde UI o API; filtro por categoría en `GET /api/productos/todos`.
 
 ---
 
@@ -364,10 +400,14 @@ flowchart TD
 | Auth | `AuthService`, `AuthController` |
 | Empresa e invitaciones | `CompanyService`, `CompanyController` |
 | Productos y permisos | `CatalogoService`, `ProductoController` |
+| Categorías | `CategoriaController`, `CatalogoService.crearCategoria`, `CatalogoService.asignarProductoCategoria` |
 | Carpetas | `CarpetaService`, `CarpetaController` |
+| Estadísticas de inventario | `InventarioService.estadisticas`, filtro opcional `categoriaId` |
 | Usuario actual y roles | `CurrentUserService` |
 | Rutas Angular | `frontend/src/app/app.routes.ts` |
 | Guards | `frontend/src/app/core/guards/auth.guard.ts` |
+| API catálogo (frontend) | `frontend/src/app/core/services/catalogo-api.service.ts` |
+| Ficha producto / filtros | `producto-detalle.component.ts`, `productos.component.ts`, `estadisticas.component.ts` |
 
 ---
 
@@ -376,6 +416,6 @@ flowchart TD
 - La base **no está en Docker local**: está en un proyecto Supabase.
 - El backend se conecta con el **Session pooler** (IPv4), variables `SPRING_DATASOURCE_*` en `.env`.
 - **RLS** está activado en las tablas: si alguien usara la API REST de Supabase con la clave `anon`, no vería filas sin políticas. Nuestro backend usa el rol `postgres` por JDBC y no depende de esas políticas.
-- El esquema lo llevamos con **Flyway**; los cambios de tablas nuevos deberían ser otra migración `V9__...sql`.
+- El esquema lo llevamos con **Flyway** (`V1`…`V10`). La migración `V9__drop_perfil_usuario_perfil.sql` eliminó las tablas `perfil` y `usuario_perfil` (sin uso; los roles van por `company_member`). La migración `V10__categoria_company.sql` hace las categorías multi-tenant (`company_id` en `categoria`).
 
 ---

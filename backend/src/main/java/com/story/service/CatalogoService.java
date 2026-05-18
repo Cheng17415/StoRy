@@ -1,5 +1,6 @@
 package com.story.service;
 
+import com.story.model.Categoria;
 import com.story.model.CategoriaResponse;
 import com.story.model.Company;
 import com.story.model.CompanyRole;
@@ -18,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,26 +52,61 @@ public class CatalogoService {
 
     @Transactional(readOnly = true)
     public List<CategoriaResponse> listarCategorias() {
-        return categoriaRepository.findAll().stream()
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        return categoriaRepository.findAllByCompany_IdOrderByNombreAsc(companyId).stream()
                 .map(c -> new CategoriaResponse(c.getId(), c.getNombre(), c.getDescripcion()))
                 .toList();
+    }
+
+    @Transactional
+    public CategoriaResponse crearCategoria(String nombre, String descripcion) {
+        currentUserService.requireRoleAtLeastEmployee();
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException("El nombre es obligatorio");
+        }
+        String trimmed = nombre.trim();
+        Company company = currentUserService.requireCurrentCompanyMember().getCompany();
+        Long companyId = company.getId();
+        if (categoriaRepository.existsByCompany_IdAndNombreIgnoreCase(companyId, trimmed)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya existe una categoría con ese nombre");
+        }
+        Categoria c = new Categoria();
+        c.setCompany(company);
+        c.setNombre(trimmed);
+        c.setDescripcion(normalizeDescripcion(descripcion));
+        categoriaRepository.save(c);
+        return new CategoriaResponse(c.getId(), c.getNombre(), c.getDescripcion());
     }
 
     /**
      * Lista productos en la carpeta indicada; {@code carpetaId == null} es la raíz (sin carpeta).
      */
     @Transactional(readOnly = true)
-    public List<ProductoResponse> listarProductos(Long carpetaId) {
+    public List<ProductoResponse> listarProductos(Long carpetaId, Long categoriaId) {
         Long companyId = currentUserService.requireCurrentCompanyId();
-        List<Producto> list;
-        if (carpetaId == null) {
-            list = productoRepository.findAllByCompany_IdAndCarpetaIsNullOrderByFechaActualizacionDesc(companyId);
-        } else {
+        if (carpetaId != null) {
             productoCarpetaRepository.findByIdAndCompany_Id(carpetaId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
-            list = productoRepository.findAllByCompany_IdAndCarpeta_IdOrderByFechaActualizacionDesc(companyId, carpetaId);
         }
-        return list.stream().map(this::toResponse).toList();
+        if (categoriaId != null) {
+            categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
+        }
+        return productoRepository.findByCompanyAndCarpetaAndCategoriaOptional(companyId, carpetaId, categoriaId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Todos los productos de la empresa (cualquier carpeta), para agregados en cliente.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductoResponse> listarTodosLosProductosDeLaEmpresa() {
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        return productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +120,7 @@ public class CatalogoService {
     @Transactional(readOnly = true)
     public ProductoResponse obtenerProducto(Long id) {
         Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_Id(id, companyId)
+        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
         return toResponse(p);
     }
@@ -191,6 +229,56 @@ public class CatalogoService {
     }
 
     @Transactional
+    public ProductoResponse agregarProductoCategoria(Long productoId, Long categoriaId, String nombre) {
+        currentUserService.requireRoleAtLeastEmployee();
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(productoId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        Categoria categoria = resolveCategoriaParaAgregar(companyId, categoriaId, nombre);
+        boolean yaAsignada = p.getCategorias().stream().anyMatch(c -> c.getId().equals(categoria.getId()));
+        if (!yaAsignada) {
+            p.getCategorias().add(categoria);
+            p.setFechaActualizacion(Instant.now());
+            productoRepository.save(p);
+        }
+        return toResponse(p);
+    }
+
+    @Transactional
+    public ProductoResponse quitarProductoCategoria(Long productoId, Long categoriaId) {
+        currentUserService.requireRoleAtLeastEmployee();
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(productoId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
+        if (p.getCategorias().removeIf(c -> c.getId().equals(categoriaId))) {
+            p.setFechaActualizacion(Instant.now());
+            productoRepository.save(p);
+        }
+        return toResponse(p);
+    }
+
+    private Categoria resolveCategoriaParaAgregar(Long companyId, Long categoriaId, String nombre) {
+        if (categoriaId != null) {
+            return categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
+        }
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException("Indica categoriaId o nombre");
+        }
+        String trimmed = nombre.trim();
+        return categoriaRepository.findByCompany_IdAndNombreIgnoreCase(companyId, trimmed)
+                .orElseGet(() -> {
+                    Categoria c = new Categoria();
+                    c.setCompany(currentUserService.requireCurrentCompanyMember().getCompany());
+                    c.setNombre(trimmed);
+                    return categoriaRepository.save(c);
+                });
+    }
+
+    @Transactional
     public ProductoResponse clonarProducto(Long productoId) {
         Long companyId = currentUserService.requireCurrentCompanyId();
         Producto origen = productoRepository.findByIdAndCompany_Id(productoId, companyId)
@@ -230,7 +318,7 @@ public class CatalogoService {
         p.setStockMinimo(origen.getStockMinimo());
         p.setCodigo(generateUniqueCodigo(companyId));
         p.setImagen(fileStorageService.copyIfStored(origen.getImagen()));
-        p.setCategoria(origen.getCategoria());
+        p.setCategorias(new HashSet<>(origen.getCategorias()));
         p.setCarpeta(carpetaDestino);
         p.setActivo(true);
         Instant now = Instant.now();
@@ -314,6 +402,10 @@ public class CatalogoService {
     }
 
     private ProductoResponse toResponse(Producto p) {
+        List<CategoriaResponse> categorias = p.getCategorias().stream()
+                .sorted(Comparator.comparing(Categoria::getNombre, String.CASE_INSENSITIVE_ORDER))
+                .map(c -> new CategoriaResponse(c.getId(), c.getNombre(), c.getDescripcion()))
+                .toList();
         return new ProductoResponse(
                 p.getId(),
                 p.getNombre(),
@@ -326,8 +418,7 @@ public class CatalogoService {
                 p.getFechaCreacion(),
                 p.getFechaActualizacion(),
                 p.getImagen(),
-                p.getCategoria() != null ? p.getCategoria().getId() : null,
-                p.getCategoria() != null ? p.getCategoria().getNombre() : null,
+                categorias,
                 p.getCarpeta() != null ? p.getCarpeta().getId() : null,
                 p.getCarpeta() != null ? p.getCarpeta().getNombre() : null
         );

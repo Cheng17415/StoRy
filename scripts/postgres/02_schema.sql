@@ -3,11 +3,6 @@
 
 SET client_encoding = 'UTF8';
 
-CREATE TABLE perfil (
-    id BIGSERIAL PRIMARY KEY,
-    perfil VARCHAR(100) NOT NULL UNIQUE
-);
-
 CREATE TABLE usuario (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -24,14 +19,6 @@ CREATE TABLE usuario (
 
 CREATE UNIQUE INDEX idx_usuario_google_provider_id ON usuario (google_provider_id)
     WHERE google_provider_id IS NOT NULL;
-
-CREATE TABLE usuario_perfil (
-    id_usuario BIGINT NOT NULL REFERENCES usuario (id) ON DELETE CASCADE,
-    id_perfil BIGINT NOT NULL REFERENCES perfil (id) ON DELETE CASCADE,
-    PRIMARY KEY (id_usuario, id_perfil)
-);
-
-CREATE INDEX idx_usuario_perfil_perfil ON usuario_perfil (id_perfil);
 
 CREATE TABLE categoria (
     id BIGSERIAL PRIMARY KEY,

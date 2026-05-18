@@ -25,10 +25,20 @@ export interface ProductoDto {
   fechaCreacion: string;
   fechaActualizacion: string;
   imagen: string | null;
-  categoriaId: number | null;
-  categoriaNombre: string | null;
+  categorias: CategoriaDto[];
   carpetaId: number | null;
   carpetaNombre: string | null;
+}
+
+/** Texto legible de categorías para listados y tablas. */
+export function formatProductoCategorias(p: ProductoDto): string {
+  if (!p.categorias?.length) return '—';
+  return p.categorias.map((c) => c.nombre).join(', ');
+}
+
+export function productoCoincideCategoria(p: ProductoDto, q: string): boolean {
+  const qq = q.toLowerCase();
+  return p.categorias?.some((c) => c.nombre.toLowerCase().includes(qq)) ?? false;
 }
 
 export interface CarpetaArbolDto {

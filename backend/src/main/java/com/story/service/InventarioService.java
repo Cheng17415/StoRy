@@ -7,6 +7,7 @@ import com.story.model.Producto;
 import com.story.model.ProductoSalidaResumen;
 import com.story.model.SerieDiaMovimiento;
 import com.story.model.TipoMovimiento;
+import com.story.repository.CategoriaRepository;
 import com.story.repository.MovimientoStockRepository;
 import com.story.repository.ProductoRepository;
 import org.springframework.http.HttpStatus;
@@ -29,15 +30,18 @@ public class InventarioService {
 
     private final MovimientoStockRepository movimientoStockRepository;
     private final ProductoRepository productoRepository;
+    private final CategoriaRepository categoriaRepository;
     private final CurrentUserService currentUserService;
 
     public InventarioService(
             MovimientoStockRepository movimientoStockRepository,
             ProductoRepository productoRepository,
+            CategoriaRepository categoriaRepository,
             CurrentUserService currentUserService
     ) {
         this.movimientoStockRepository = movimientoStockRepository;
         this.productoRepository = productoRepository;
+        this.categoriaRepository = categoriaRepository;
         this.currentUserService = currentUserService;
     }
 
@@ -61,7 +65,7 @@ public class InventarioService {
      * Agrega movimientos de la empresa en {@code [desde, hasta)} (instantes UTC) para cuadros de mando y series por día.
      */
     @Transactional(readOnly = true)
-    public InventarioEstadisticasResponse estadisticas(Instant desde, Instant hasta) {
+    public InventarioEstadisticasResponse estadisticas(Instant desde, Instant hasta, Long categoriaId) {
         currentUserService.requireCompanyAdminOrAnalyticsViewer();
         if (!desde.isBefore(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El instante 'desde' debe ser anterior a 'hasta'");
@@ -71,8 +75,12 @@ public class InventarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 366 días");
         }
         Long companyId = currentUserService.requireCurrentCompanyId();
+        if (categoriaId != null) {
+            categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
+        }
         List<MovimientoStock> rows =
-                movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
+                movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta, categoriaId);
 
         long unidadesEntrada = 0;
         long unidadesSalida = 0;

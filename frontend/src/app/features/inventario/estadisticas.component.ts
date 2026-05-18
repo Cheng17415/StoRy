@@ -1,7 +1,7 @@
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { InventarioEstadisticasDto } from '../../core/models/catalogo.models';
+import { InventarioEstadisticasDto, CategoriaDto } from '../../core/models/catalogo.models';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
 
 @Component({
@@ -20,7 +20,7 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       </header>
 
       <section class="stats-filters" aria-labelledby="filtros-stats">
-        <h2 id="filtros-stats" class="sr-only">Rango de fechas</h2>
+        <h2 id="filtros-stats" class="sr-only">Filtros</h2>
         <div class="filters-row">
           <label>
             Desde
@@ -29,6 +29,19 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
           <label>
             Hasta
             <input type="date" [value]="hastaStr()" (change)="onHasta($event)" />
+          </label>
+          <label class="stats-cat-filter">
+            Categoría
+            <select
+              class="stats-cat-select"
+              [value]="categoriaFiltro() != null ? '' + categoriaFiltro() : ''"
+              (change)="onCategoriaFiltroChange($event)"
+            >
+              <option value="">Todas</option>
+              @for (c of categorias(); track c.id) {
+                <option [value]="'' + c.id">{{ c.nombre }}</option>
+              }
+            </select>
           </label>
           <button type="button" class="btn-apply" (click)="cargar()" [disabled]="loading()">
             {{ loading() ? 'Cargando…' : 'Actualizar' }}
@@ -317,6 +330,26 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       color: var(--story-text-muted);
     }
 
+    .stats-cat-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--story-text-muted);
+    }
+
+    .stats-cat-select {
+      min-width: 10rem;
+      padding: 0.45rem 0.65rem;
+      border: 1px solid var(--story-border-strong);
+      border-radius: 8px;
+      background: var(--story-surface);
+      font: inherit;
+      font-weight: 500;
+      color: var(--story-text);
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -338,11 +371,17 @@ export class EstadisticasComponent implements OnInit {
 
   protected readonly desdeStr = signal(EstadisticasComponent.defaultDesde());
   protected readonly hastaStr = signal(EstadisticasComponent.defaultHasta());
+  protected readonly categoriaFiltro = signal<number | null>(null);
+  protected readonly categorias = signal<CategoriaDto[]>([]);
   protected readonly data = signal<InventarioEstadisticasDto | null>(null);
   protected readonly loading = signal(false);
   protected readonly errorMsg = signal<string | null>(null);
 
   ngOnInit(): void {
+    this.api.getCategorias().subscribe({
+      next: (list) => this.categorias.set(list),
+      error: () => this.categorias.set([]),
+    });
     this.cargar();
   }
 
@@ -371,11 +410,21 @@ export class EstadisticasComponent implements OnInit {
     if (v) this.hastaStr.set(v);
   }
 
+  protected onCategoriaFiltroChange(ev: Event): void {
+    const raw = (ev.target as HTMLSelectElement).value;
+    if (raw === '') {
+      this.categoriaFiltro.set(null);
+      return;
+    }
+    const id = Number(raw);
+    this.categoriaFiltro.set(Number.isFinite(id) ? id : null);
+  }
+
   protected cargar(): void {
     this.loading.set(true);
     this.errorMsg.set(null);
     this.api
-      .getInventarioEstadisticas(this.desdeStr(), this.hastaStr())
+      .getInventarioEstadisticas(this.desdeStr(), this.hastaStr(), this.categoriaFiltro())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (d) => {

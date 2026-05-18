@@ -1,6 +1,7 @@
 import { AsyncPipe, CurrencyPipe, DatePipe } from '@angular/common';
 import {
   Component,
+  computed,
   ElementRef,
   HostListener,
   inject,
@@ -11,14 +12,29 @@ import {
 import { toObservable } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { BehaviorSubject, catchError, combineLatest, map, of, switchMap, tap } from 'rxjs';
-import { CarpetaArbolDto, MovimientoStockDto, ProductoDto } from '../../core/models/catalogo.models';
+import {
+  BehaviorSubject,
+  catchError,
+  combineLatest,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
+import { CarpetaArbolDto, CategoriaDto, MovimientoStockDto, ProductoDto, formatProductoCategorias, productoCoincideCategoria } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService, ProductoFormPayload } from '../../core/services/catalogo-api.service';
 
 interface ProductosPageData {
   items: ProductoDto[];
   itemCount: number;
+  totalQty: number;
+  totalValue: number;
+}
+
+/** Subcarpeta con totales recursivos (uds. y valor). */
+interface CarpetaSubcarpetaVm extends CarpetaArbolDto {
   totalQty: number;
   totalValue: number;
 }
@@ -95,16 +111,6 @@ function collectCarpetaSubtreeIds(nodes: CarpetaArbolDto[], rootId: number): Set
   return out;
 }
 
-function flattenCarpetaOptions(nodes: CarpetaArbolDto[], depth = 0): { id: number; label: string }[] {
-  const rows: { id: number; label: string }[] = [];
-  const pad = depth === 0 ? '' : `${'· '.repeat(depth)}`;
-  for (const n of nodes) {
-    rows.push({ id: n.id, label: `${pad}${n.nombre}`.trim() });
-    rows.push(...flattenCarpetaOptions(n.hijos ?? [], depth + 1));
-  }
-  return rows;
-}
-
 function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number; nombre: string }[] {
   for (const n of nodes) {
     if (n.id === targetId) {
@@ -118,13 +124,75 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
   return [];
 }
 
+interface CarpetaTreeRow {
+  id: number;
+  nombre: string;
+  depth: number;
+}
+
+/** Lista plana del árbol con profundidad para el panel lateral (indentación). */
+function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTreeRow[] {
+  const rows: CarpetaTreeRow[] = [];
+  for (const n of nodes) {
+    rows.push({ id: n.id, nombre: n.nombre, depth });
+    rows.push(...flattenCarpetasForTree(n.hijos ?? [], depth + 1));
+  }
+  return rows;
+}
+
 @Component({
   selector: 'app-productos',
   standalone: true,
   imports: [AsyncPipe, DatePipe, CurrencyPipe, ReactiveFormsModule],
   template: `
     <div class="productos-page">
-      <header class="page-head">
+      <div class="productos-layout">
+        <aside class="productos-tree" aria-label="Árbol de carpetas">
+          <div class="productos-tree-title">Carpetas</div>
+          <nav class="productos-tree-nav">
+            <button
+              type="button"
+              class="tree-row tree-row--root"
+              [class.tree-row--active]="currentCarpetaId() === null"
+              (click)="treeGoTo(null)"
+            >
+              <span class="tree-row-icon" aria-hidden="true">
+                <svg class="tree-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                    d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"
+                  />
+                </svg>
+              </span>
+              <span class="tree-row-label">Todos los productos</span>
+            </button>
+            @for (row of flatFolderTree(); track row.id) {
+              <button
+                type="button"
+                class="tree-row"
+                [class.tree-row--active]="currentCarpetaId() === row.id"
+                [style.padding-left.px]="10 + row.depth * 16"
+                (click)="treeGoTo(row.id)"
+              >
+                <span class="tree-row-icon" aria-hidden="true">
+                  <svg class="tree-icon-svg tree-icon-svg--muted" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linejoin="round"
+                      d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"
+                    />
+                  </svg>
+                </span>
+                <span class="tree-row-label">{{ row.nombre }}</span>
+              </button>
+            }
+          </nav>
+        </aside>
+        <div class="productos-main">
+          <header class="page-head">
         <h1 class="page-title">Todos los productos</h1>
         <div class="page-head-actions">
           @if (canManageFolders()) {
@@ -156,6 +224,19 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
             (input)="onSearch($event)"
           />
         </div>
+        <label class="cat-filter">
+          <span class="cat-filter-label">Categoría</span>
+          <select
+            class="cat-filter-select"
+            [value]="categoriaFiltro() != null ? '' + categoriaFiltro() : ''"
+            (change)="onCategoriaFiltroChange($event)"
+          >
+            <option value="">Todas</option>
+            @for (c of categorias(); track c.id) {
+              <option [value]="'' + c.id">{{ c.nombre }}</option>
+            }
+          </select>
+        </label>
         <div class="toolbar-right">
           <div class="layout-dropdown" #layoutDropdown>
             <button
@@ -269,80 +350,95 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       </section>
 
       @if (vm$ | async; as vm) {
-        @if (vm.subcarpetas.length > 0) {
-          <section class="folder-strip" aria-label="Subcarpetas">
-            @for (d of vm.subcarpetas; track d.id) {
-              <div class="folder-row">
-                <button type="button" class="folder-open" (click)="enterFolder(d)">
-                  @if (d.imagen) {
-                    <span class="folder-thumb-wrap">
-                      <img [src]="d.imagen" [alt]="''" class="folder-thumb" />
-                    </span>
-                  } @else {
-                    <span class="folder-glyph" aria-hidden="true"></span>
-                  }
-                  <span class="folder-open-label">{{ d.nombre }}</span>
-                </button>
-                @if (canManageFolders()) {
-                  <div class="folder-item-menu-root" data-stop-nav>
-                    <button
-                      type="button"
-                      class="card-kebab"
-                      [class.open]="folderMenuId() === d.id"
-                      [attr.aria-expanded]="folderMenuId() === d.id"
-                      aria-haspopup="menu"
-                      aria-label="Más acciones en carpeta"
-                      (click)="toggleFolderMenu(d.id, $event)"
-                    >
-                      <svg class="card-kebab-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <circle cx="12" cy="5" r="2" fill="currentColor" />
-                        <circle cx="12" cy="12" r="2" fill="currentColor" />
-                        <circle cx="12" cy="19" r="2" fill="currentColor" />
-                      </svg>
-                    </button>
-                    @if (folderMenuId() === d.id) {
-                      <div class="card-dropdown card-dropdown--left" role="menu">
-                        <button type="button" role="menuitem" class="card-dd-item" (click)="renameFolderPrompt(d)">
-                          Renombrar
-                        </button>
-                        <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                          Mover…
-                        </button>
-                        <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
-                          Clonar carpeta
-                        </button>
-                        @if (canDeleteProduct()) {
-                          <button type="button" role="menuitem" class="card-dd-item danger" (click)="deleteFolderConfirm(d)">
-                            Eliminar carpeta
-                          </button>
+        @switch (layoutMode()) {
+          @case ('grid') {
+            @if (vm.subcarpetas.length > 0) {
+              <section class="folder-block card-grid" aria-label="Subcarpetas">
+                @for (d of vm.subcarpetas; track d.id) {
+                  <article class="product-card product-card--click folder-card" (click)="enterFolder(d, $event)">
+                    <div class="card-image-wrap">
+                      @if (d.imagen) {
+                        <img [src]="d.imagen" [alt]="d.nombre" class="card-image" />
+                      } @else {
+                        <div class="card-placeholder card-placeholder--folder" aria-hidden="true">
+                          <svg class="folder-placeholder-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                            />
+                          </svg>
+                        </div>
+                      }
+                    </div>
+                    <div class="card-body">
+                      <div class="card-title-row">
+                        <h2 class="card-title">{{ d.nombre }}</h2>
+                        @if (canManageFolders()) {
+                          <div class="folder-item-menu-root" data-stop-nav>
+                            <button
+                              type="button"
+                              class="card-kebab"
+                              [class.open]="folderMenuId() === d.id"
+                              [attr.aria-expanded]="folderMenuId() === d.id"
+                              aria-haspopup="menu"
+                              aria-label="Más acciones en carpeta"
+                              (click)="toggleFolderMenu(d.id, $event)"
+                            >
+                              <svg class="card-kebab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="12" cy="5" r="2" fill="currentColor" />
+                                <circle cx="12" cy="12" r="2" fill="currentColor" />
+                                <circle cx="12" cy="19" r="2" fill="currentColor" />
+                              </svg>
+                            </button>
+                            @if (folderMenuId() === d.id) {
+                              <div class="card-dropdown card-dropdown--left" role="menu">
+                                <button type="button" role="menuitem" class="card-dd-item" (click)="renameFolderPrompt(d)">
+                                  Renombrar
+                                </button>
+                                <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
+                                  Mover…
+                                </button>
+                                <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
+                                  Clonar carpeta
+                                </button>
+                                @if (canDeleteProduct()) {
+                                  <button type="button" role="menuitem" class="card-dd-item danger" (click)="deleteFolderConfirm(d)">
+                                    Eliminar carpeta
+                                  </button>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
-                    }
-                  </div>
+                      <p class="card-meta">
+                        <span class="folder-meta-label">Carpeta</span>
+                      </p>
+                      <div class="card-footer">
+                        <span class="card-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
+                        <span class="card-sep">|</span>
+                        <span class="card-price">{{ d.totalValue | currency: companyCurrency() }}</span>
+                      </div>
+                    </div>
+                  </article>
                 }
-              </div>
+              </section>
             }
-          </section>
-        }
-
-        <section class="stats-bar" aria-label="Resumen">
-          <div class="stat">
-            <span class="stat-label">Productos</span>
-            <span class="stat-value">{{ vm.pageData.itemCount }}</span>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Cantidad total</span>
-            <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Valor total</span>
-            <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
-          </div>
-        </section>
-
-        @if (vm.pageData.items.length !== 0){
-          @switch (layoutMode()) {
-            @case ('grid') {
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-label">Productos</span>
+                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Cantidad total</span>
+                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Valor total</span>
+                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+              </div>
+            </section>
+            @if (vm.pageData.items.length > 0) {
               <div class="card-grid">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-card product-card--click" (click)="goToProducto(p.id, $event)">
@@ -375,7 +471,7 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                             </svg>
                           </button>
                           @if (itemMenuId() === p.id) {
-                            <div class="card-dropdown" role="menu">
+                            <div class="card-dropdown card-dropdown--left" role="menu">
                               <button type="button" role="menuitem" class="card-dd-item" (click)="openHistorial(p)">
                                 Historial de stock
                               </button>
@@ -420,13 +516,96 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                 }
               </div>
             }
-            @case ('list') {
+          }
+          @case ('list') {
+            @if (vm.subcarpetas.length > 0) {
+              <section class="folder-block product-list" aria-label="Subcarpetas">
+                @for (d of vm.subcarpetas; track d.id) {
+                  <article class="product-list-row folder-list-row" (click)="enterFolder(d, $event)">
+                    <div class="list-thumb">
+                      @if (d.imagen) {
+                        <img [src]="d.imagen" [alt]="''" class="list-thumb-img" />
+                      } @else {
+                        <div class="list-thumb-placeholder list-thumb-placeholder--folder" aria-hidden="true">
+                          <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                            />
+                          </svg>
+                        </div>
+                      }
+                    </div>
+                    <div class="list-main">
+                      <h2 class="list-title">{{ d.nombre }}</h2>
+                      <p class="list-meta"><span class="folder-meta-label">Carpeta</span></p>
+                    </div>
+                    <div class="list-stats">
+                      <span class="list-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
+                      <span class="list-price">{{ d.totalValue | currency: companyCurrency() }}</span>
+                    </div>
+                    @if (canManageFolders()) {
+                      <div class="folder-item-menu-root list-kebab" data-stop-nav>
+                        <button
+                          type="button"
+                          class="card-kebab"
+                          [class.open]="folderMenuId() === d.id"
+                          [attr.aria-expanded]="folderMenuId() === d.id"
+                          aria-haspopup="menu"
+                          aria-label="Más acciones en carpeta"
+                          (click)="toggleFolderMenu(d.id, $event)"
+                        >
+                          <svg class="card-kebab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="5" r="2" fill="currentColor" />
+                            <circle cx="12" cy="12" r="2" fill="currentColor" />
+                            <circle cx="12" cy="19" r="2" fill="currentColor" />
+                          </svg>
+                        </button>
+                        @if (folderMenuId() === d.id) {
+                          <div class="card-dropdown card-dropdown--left" role="menu">
+                            <button type="button" role="menuitem" class="card-dd-item" (click)="renameFolderPrompt(d)">
+                              Renombrar
+                            </button>
+                            <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
+                              Mover…
+                            </button>
+                            <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
+                              Clonar carpeta
+                            </button>
+                            @if (canDeleteProduct()) {
+                              <button type="button" role="menuitem" class="card-dd-item danger" (click)="deleteFolderConfirm(d)">
+                                Eliminar carpeta
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </article>
+                }
+              </section>
+            }
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-label">Productos</span>
+                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Cantidad total</span>
+                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Valor total</span>
+                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+              </div>
+            </section>
+            @if (vm.pageData.items.length > 0) {
               <div class="product-list">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-list-row" (click)="goToProducto(p.id, $event)">
                     <div class="list-thumb">
                       @if (p.imagen) {
-                        <img [src]="p.imagen" [alt]="" class="list-thumb-img" />
+                        <img [src]="p.imagen" [alt]="''" class="list-thumb-img" />
                       } @else {
                         <div class="list-thumb-placeholder" aria-hidden="true">◇</div>
                       }
@@ -435,8 +614,8 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                       <h2 class="list-title" [class.stock-bajo]="esStockBajo(p)">{{ p.nombre }}</h2>
                       <p class="list-meta">
                         <span class="card-code">{{ p.codigo }}</span>
-                        @if (p.categoriaNombre) {
-                          <span class="list-cat"> · {{ p.categoriaNombre }}</span>
+                        @if (p.categorias.length) {
+                          <span class="list-cat"> · {{ formatProductoCategorias(p) }}</span>
                         }
                       </p>
                     </div>
@@ -496,7 +675,23 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                 }
               </div>
             }
-            @case ('table') {
+          }
+          @case ('table') {
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-label">Productos</span>
+                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Cantidad total</span>
+                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Valor total</span>
+                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+              </div>
+            </section>
+            @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
               <div class="table-scroll">
                 <table class="product-table">
                   <thead>
@@ -506,11 +701,75 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                       <th scope="col">Código</th>
                       <th scope="col">Categoría</th>
                       <th scope="col" class="col-num">Uds.</th>
-                      <th scope="col" class="col-num">Precio</th>
+                      <th scope="col" class="col-num">Precio / valor</th>
                       <th scope="col" class="col-actions">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
+                    @for (d of vm.subcarpetas; track d.id) {
+                      <tr class="product-table-row folder-table-row" (click)="enterFolder(d, $event)">
+                        <td class="td-thumb">
+                          @if (d.imagen) {
+                            <img [src]="d.imagen" [alt]="''" class="table-thumb-img" />
+                          } @else {
+                            <div class="table-thumb-ph table-thumb-ph--folder" aria-hidden="true">
+                              <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  fill="currentColor"
+                                  d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                                />
+                              </svg>
+                            </div>
+                          }
+                        </td>
+                        <td class="td-name">{{ d.nombre }}</td>
+                        <td class="td-code">—</td>
+                        <td><span class="folder-meta-label">Carpeta</span></td>
+                        <td class="col-num">{{ d.totalQty }}</td>
+                        <td class="col-num td-price">{{ d.totalValue | currency: companyCurrency() }}</td>
+                        <td class="td-actions" data-stop-nav (click)="$event.stopPropagation()">
+                          @if (canManageFolders()) {
+                            <div class="folder-item-menu-root table-kebab">
+                              <button
+                                type="button"
+                                class="card-kebab"
+                                [class.open]="folderMenuId() === d.id"
+                                [attr.aria-expanded]="folderMenuId() === d.id"
+                                aria-haspopup="menu"
+                                aria-label="Más acciones en carpeta"
+                                (click)="toggleFolderMenu(d.id, $event)"
+                              >
+                                <svg class="card-kebab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                  <circle cx="12" cy="5" r="2" fill="currentColor" />
+                                  <circle cx="12" cy="12" r="2" fill="currentColor" />
+                                  <circle cx="12" cy="19" r="2" fill="currentColor" />
+                                </svg>
+                              </button>
+                              @if (folderMenuId() === d.id) {
+                                <div class="card-dropdown card-dropdown--left" role="menu">
+                                  <button type="button" role="menuitem" class="card-dd-item" (click)="renameFolderPrompt(d)">
+                                    Renombrar
+                                  </button>
+                                  <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
+                                    Mover…
+                                  </button>
+                                  <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
+                                    Clonar carpeta
+                                  </button>
+                                  @if (canDeleteProduct()) {
+                                    <button type="button" role="menuitem" class="card-dd-item danger" (click)="deleteFolderConfirm(d)">
+                                      Eliminar carpeta
+                                    </button>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            —
+                          }
+                        </td>
+                      </tr>
+                    }
                     @for (p of vm.pageData.items; track p.id) {
                       <tr
                         [class.row-stock-bajo]="esStockBajo(p)"
@@ -519,14 +778,14 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
                       >
                         <td class="td-thumb">
                           @if (p.imagen) {
-                            <img [src]="p.imagen" [alt]="" class="table-thumb-img" />
+                            <img [src]="p.imagen" [alt]="''" class="table-thumb-img" />
                           } @else {
                             <div class="table-thumb-ph" aria-hidden="true">◇</div>
                           }
                         </td>
                         <td class="td-name" [class.stock-bajo]="esStockBajo(p)">{{ p.nombre }}</td>
                         <td class="td-code">{{ p.codigo }}</td>
-                        <td>{{ p.categoriaNombre ?? '—' }}</td>
+                        <td>{{ formatProductoCategorias(p) }}</td>
                         <td class="col-num">{{ p.cantidad }}</td>
                         <td class="col-num td-price">
                           @if (p.precio != null) {
@@ -605,6 +864,8 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       } @else {
         <p class="loading">Cargando…</p>
       }
+        </div>
+      </div>
     </div>
 
     <dialog #historialDialog class="modal historial-modal" (cancel)="$event.preventDefault()">
@@ -775,20 +1036,56 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       </div>
     </dialog>
 
-    <dialog #moveTargetDialog class="modal" (cancel)="$event.preventDefault()">
-      <div class="modal-inner">
+    <dialog #moveTargetDialog class="modal modal--move-picker" (cancel)="$event.preventDefault()">
+      <div class="modal-inner modal-inner--move-picker">
         <h3>{{ moveDialogTitle() }}</h3>
-        <label>
-          Carpeta destino
-          <select #moveTargetSelect class="move-target-select">
-            @for (opt of moveSelectOptions(); track opt.label + ':' + (opt.id ?? 'root')) {
-              <option [value]="opt.id === null ? '' : '' + opt.id">{{ opt.label }}</option>
-            }
-          </select>
-        </label>
+        <p class="move-picker-hint">Carpeta destino</p>
+        <nav class="productos-tree-nav move-picker-tree" aria-label="Carpeta destino">
+          <button
+            type="button"
+            class="tree-row tree-row--root"
+            [class.tree-row--active]="movePickerSelection() === null"
+            (click)="selectMovePickerTarget(null)"
+          >
+            <span class="tree-row-icon" aria-hidden="true">
+              <svg class="tree-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                  d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"
+                />
+              </svg>
+            </span>
+            <span class="tree-row-label">Todos los productos</span>
+          </button>
+          @for (row of flatFolderTree(); track row.id) {
+            <button
+              type="button"
+              class="tree-row"
+              [class.tree-row--active]="movePickerSelection() === row.id"
+              [class.tree-row--disabled]="!movePickerAllowsFolder(row.id)"
+              [disabled]="!movePickerAllowsFolder(row.id)"
+              [style.padding-left.px]="10 + row.depth * 16"
+              (click)="selectMovePickerTarget(row.id)"
+            >
+              <span class="tree-row-icon" aria-hidden="true">
+                <svg class="tree-icon-svg tree-icon-svg--muted" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                    d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"
+                  />
+                </svg>
+              </span>
+              <span class="tree-row-label">{{ row.nombre }}</span>
+            </button>
+          }
+        </nav>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeMoveDialog()">Cancelar</button>
-          <button type="button" class="btn-submit" (click)="confirmMoveTarget(moveTargetSelect.value)">Mover</button>
+          <button type="button" class="btn-submit" (click)="confirmMoveFromPicker()">Mover</button>
         </div>
       </div>
     </dialog>
@@ -807,9 +1104,131 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
     }
 
     .productos-page {
-      max-width: 1280px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 0 0 2rem;
+      padding: 0 0.75rem 2rem;
+    }
+
+    .productos-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+    }
+
+    .productos-tree {
+      flex: 0 0 260px;
+      max-width: 280px;
+      position: sticky;
+      top: 0.75rem;
+      align-self: flex-start;
+      max-height: calc(100vh - 1.5rem);
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
+      background: var(--inv-surface);
+      box-shadow: var(--inv-shadow);
+    }
+
+    .productos-tree-title {
+      padding: 0.65rem 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--inv-muted);
+      border-bottom: 1px solid var(--inv-border);
+    }
+
+    .productos-tree-nav {
+      padding: 0.35rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.875rem;
+      color: #374151;
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      margin: 0 0.35rem;
+      box-sizing: border-box;
+    }
+
+    .tree-row:hover {
+      background: #f3f4f6;
+    }
+
+    .tree-row:focus-visible {
+      outline: 2px solid var(--inv-cta);
+      outline-offset: 2px;
+    }
+
+    .tree-row--active {
+      background: #fef2f2;
+      color: var(--inv-cta);
+      font-weight: 600;
+    }
+
+    .tree-row-icon {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .tree-icon-svg {
+      width: 18px;
+      height: 18px;
+      color: #4b5563;
+    }
+
+    .tree-icon-svg--muted {
+      color: #9ca3af;
+    }
+
+    .tree-row--active .tree-icon-svg,
+    .tree-row--active .tree-icon-svg--muted {
+      color: var(--inv-cta);
+    }
+
+    .tree-row-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .productos-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    @media (max-width: 799px) {
+      .productos-layout {
+        flex-direction: column;
+      }
+
+      .productos-tree {
+        position: relative;
+        top: 0;
+        max-height: 220px;
+        flex: none;
+        width: 100%;
+        max-width: none;
+      }
     }
 
     .page-head {
@@ -885,80 +1304,81 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       user-select: none;
     }
 
-    .folder-strip {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+    .folder-block {
       margin-bottom: 1rem;
     }
 
-    .folder-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.55rem 0.75rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      background: #fafafa;
+    .folder-block.card-grid {
+      gap: 1.25rem;
     }
 
-    .folder-open {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font: inherit;
+    .folder-card .card-placeholder--folder {
+      background: linear-gradient(145deg, #e0e7ff, #eef2ff);
+    }
+
+    .folder-placeholder-icon {
+      width: 2.75rem;
+      height: 2.75rem;
+      color: #a5b4fc;
+      opacity: 0.95;
+    }
+
+    .folder-placeholder-icon--sm {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+
+    .list-thumb-placeholder--folder {
+      background: linear-gradient(145deg, #e0e7ff, #eef2ff);
+    }
+
+    .folder-meta-label {
+      font-family: inherit;
+      color: #6366f1;
       font-weight: 600;
-      color: #111827;
-      text-align: left;
-      flex: 1;
-      min-width: 0;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .folder-open:hover {
-      color: var(--inv-cta);
+    tr.folder-table-row {
+      background: #f8fafc;
     }
 
-    .folder-glyph {
-      width: 1.25rem;
-      height: 1rem;
-      border-radius: 2px;
-      border: 2px solid #6b7280;
-      flex-shrink: 0;
+    tr.folder-table-row .td-name {
+      font-weight: 700;
+    }
+
+    .modal--move-picker {
+      max-width: 22rem;
+      width: calc(100vw - 2rem);
+    }
+
+    .modal-inner--move-picker .move-picker-hint {
+      margin: 0 0 0.65rem;
+      font-size: 0.82rem;
+      color: var(--inv-muted);
+      font-weight: 500;
+    }
+
+    .move-picker-tree {
+      max-height: min(55vh, 280px);
+      overflow-y: auto;
+      margin: 0 0 0.25rem;
+      padding: 0.35rem 0;
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
+      background: #fafafa;
       box-sizing: border-box;
     }
 
-    .folder-thumb-wrap {
-      flex-shrink: 0;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid var(--inv-border);
-      background: #fff;
+    .move-picker-tree .tree-row--disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
     }
 
-    .folder-thumb {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .folder-open-label {
-      min-width: 0;
-    }
-
-    .move-target-select {
-      margin-top: 0.35rem;
-      width: 100%;
-      padding: 0.45rem 0.5rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 6px;
-      font: inherit;
+    .move-picker-tree .tree-row--disabled:hover {
+      background: transparent;
     }
 
     .folder-item-menu-root {
@@ -1029,6 +1449,31 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
     .search-input:focus {
       border-color: #c4c4c4;
       box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+    }
+
+    .cat-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-width: 10rem;
+    }
+
+    .cat-filter-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--inv-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .cat-filter-select {
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--inv-border);
+      border-radius: 8px;
+      background: var(--inv-surface);
+      font: inherit;
+      font-size: 0.9rem;
+      color: var(--inv-text);
     }
 
     .toolbar-right {
@@ -1268,10 +1713,18 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
     .product-card {
       background: var(--inv-surface);
       border-radius: 10px;
-      overflow: hidden;
+      overflow: visible;
       border: 1px solid var(--inv-border);
       box-shadow: var(--inv-shadow);
       transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    /** Encima de la tarjeta/fila siguiente cuando el menú ⋮ está abierto (evita que tape el dropdown) */
+    .product-card:has(.card-kebab.open),
+    .product-list-row:has(.card-kebab.open),
+    .product-table-row:has(.card-kebab.open) {
+      position: relative;
+      z-index: 5;
     }
 
     .product-card--click {
@@ -1287,6 +1740,8 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       position: relative;
       aspect-ratio: 4 / 3;
       background: #eceef1;
+      border-radius: 10px 10px 0 0;
+      overflow: hidden;
     }
 
     .card-image {
@@ -1348,9 +1803,13 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
 
     .product-card:hover .card-kebab,
     .product-card .card-kebab.open,
+    .folder-card:hover .card-kebab,
+    .folder-card .card-kebab.open,
     .product-list-row:hover .list-kebab .card-kebab,
+    .folder-list-row:hover .list-kebab .card-kebab,
     .list-kebab .card-kebab.open,
     .product-table-row:hover .table-kebab .card-kebab,
+    .folder-table-row:hover .table-kebab .card-kebab,
     .table-kebab .card-kebab.open {
       opacity: 1;
     }
@@ -1698,7 +2157,7 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
       border-radius: 10px;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: var(--inv-shadow);
     }
 
@@ -1767,6 +2226,10 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
       justify-content: center;
       font-size: 0.85rem;
       color: #c5c9d0;
+    }
+
+    .table-thumb-ph--folder {
+      background: linear-gradient(145deg, #e0e7ff, #eef2ff);
     }
 
     .td-name {
@@ -1977,6 +2440,8 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
   `,
 })
 export class ProductosComponent implements OnInit {
+  protected readonly formatProductoCategorias = formatProductoCategorias;
+
   private readonly api = inject(CatalogoApiService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
@@ -1992,16 +2457,24 @@ export class ProductosComponent implements OnInit {
     { id: null, nombre: 'Productos' },
   ]);
   protected readonly currentCarpetaId = signal<number | null>(null);
+  protected readonly categoriaFiltro = signal<number | null>(null);
+  protected readonly categorias = signal<CategoriaDto[]>([]);
   private readonly carpetaId$ = toObservable(this.currentCarpetaId);
+  private readonly categoriaFiltro$ = toObservable(this.categoriaFiltro);
 
   /** Menú ⋮ por carpeta */
   protected readonly folderMenuId = signal<number | null>(null);
   protected readonly moveDialogTitle = signal('Mover');
-  protected readonly moveSelectOptions = signal<{ id: number | null; label: string }[]>([]);
+  /** IDs de carpeta no elegibles (p. ej. subárbol al mover una carpeta). */
+  protected readonly movePickerExcludedIds = signal<Set<number>>(new Set());
+  /** Destino: `null` = raíz (sin carpeta). */
+  protected readonly movePickerSelection = signal<number | null>(null);
   private pendingFolderMove: CarpetaArbolDto | null = null;
   private pendingProductMove: ProductoDto | null = null;
 
   private readonly latestArbol = signal<CarpetaArbolDto[]>([]);
+
+  protected readonly flatFolderTree = computed(() => flattenCarpetasForTree(this.latestArbol()));
 
   /** Criterio activo: primer clic en un criterio usa dirección por defecto; segundo clic en el mismo alterna asc/desc. */
   protected readonly sortState = signal<SortState>({ field: 'name', dir: 'asc' });
@@ -2033,24 +2506,37 @@ export class ProductosComponent implements OnInit {
   protected readonly vm$ = combineLatest([
     this.reload$,
     this.carpetaId$,
+    this.categoriaFiltro$,
     this.search$,
     this.sortState$,
   ]).pipe(
-    switchMap(([_, fid, q, sort]) =>
-      this.api.getProductos(fid).pipe(
-        switchMap((productos) =>
-          this.api.getCarpetasArbol().pipe(
-            catchError(() => {
-              this.latestArbol.set([]);
-              return of<CarpetaArbolDto[]>([]);
-            }),
-            tap((arbol) => this.latestArbol.set(arbol)),
-            map((arbol) => ({
-              pageData: this.buildPageData(productos, q, sort),
-              subcarpetas: carpetasEnNivel(arbol, fid),
-            })),
-          ),
+    switchMap(([_, fid, catId, q, sort]) =>
+      forkJoin({
+        page: this.api.getProductos(fid, catId),
+        allCompany: this.api.getTodosProductosEmpresa().pipe(
+          catchError(() => of<ProductoDto[]>([])),
         ),
+        arbol: this.api.getCarpetasArbol().pipe(
+          catchError(() => of<CarpetaArbolDto[]>([])),
+        ),
+      }).pipe(
+        tap(({ arbol }) => this.latestArbol.set(arbol)),
+        map(({ page, allCompany, arbol }) => {
+          const qq = q.trim().toLowerCase();
+          let subcarpetas = this.buildSubcarpetasVm(
+            carpetasEnNivel(arbol, fid),
+            arbol,
+            allCompany,
+          );
+          if (qq) {
+            subcarpetas = subcarpetas.filter((d) => d.nombre.toLowerCase().includes(qq));
+          }
+          subcarpetas = this.sortSubcarpetas(subcarpetas, sort);
+          return {
+            pageData: this.buildPageData(page, q, sort),
+            subcarpetas,
+          };
+        }),
       ),
     ),
   );
@@ -2095,6 +2581,11 @@ export class ProductosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.api.getCategorias().subscribe({
+      next: (list) => this.categorias.set(list),
+      error: () => this.categorias.set([]),
+    });
+
     const raw = this.route.snapshot.queryParamMap.get('carpeta');
     if (!raw) {
       return;
@@ -2134,7 +2625,37 @@ export class ProductosComponent implements OnInit {
     this.syncQueryParam();
   }
 
-  protected enterFolder(d: CarpetaArbolDto): void {
+  /** Navegación desde el panel de árbol (equivalente a migas de pan). */
+  protected treeGoTo(carpetaId: number | null): void {
+    if (carpetaId === null) {
+      this.breadcrumbs.set([{ id: null, nombre: 'Productos' }]);
+      this.currentCarpetaId.set(null);
+    } else {
+      const tree = this.latestArbol();
+      const path = pathToFolder(tree, carpetaId);
+      if (path.length) {
+        this.breadcrumbs.set([{ id: null, nombre: 'Productos' }, ...path]);
+      } else {
+        this.breadcrumbs.set([
+          { id: null, nombre: 'Productos' },
+          { id: carpetaId, nombre: 'Carpeta' },
+        ]);
+      }
+      this.currentCarpetaId.set(carpetaId);
+    }
+    this.folderMenuId.set(null);
+    this.itemMenuId.set(null);
+    this.refreshList();
+    this.syncQueryParam();
+  }
+
+  protected enterFolder(d: CarpetaArbolDto, ev?: MouseEvent): void {
+    if (ev) {
+      const el = ev.target as HTMLElement | null;
+      if (el?.closest?.('[data-stop-nav]')) {
+        return;
+      }
+    }
     this.breadcrumbs.update((b) => [...b, { id: d.id, nombre: d.nombre }]);
     this.currentCarpetaId.set(d.id);
     this.folderMenuId.set(null);
@@ -2233,11 +2754,8 @@ export class ProductosComponent implements OnInit {
     this.moveDialogTitle.set('Mover carpeta');
     const tree = this.latestArbol();
     const ex = collectCarpetaSubtreeIds(tree, d.id);
-    const opts = [
-      { id: null as number | null, label: 'Raíz (sin carpeta)' },
-      ...flattenCarpetaOptions(tree).filter((o) => !ex.has(o.id)),
-    ];
-    this.moveSelectOptions.set(opts);
+    this.movePickerExcludedIds.set(ex);
+    this.movePickerSelection.set(null);
     queueMicrotask(() => this.moveDialogRef()?.nativeElement.showModal());
   }
 
@@ -2299,12 +2817,8 @@ export class ProductosComponent implements OnInit {
     this.pendingProductMove = p;
     this.pendingFolderMove = null;
     this.moveDialogTitle.set('Mover producto');
-    const tree = this.latestArbol();
-    const opts = [
-      { id: null as number | null, label: 'Raíz (sin carpeta)' },
-      ...flattenCarpetaOptions(tree),
-    ];
-    this.moveSelectOptions.set(opts);
+    this.movePickerExcludedIds.set(new Set());
+    this.movePickerSelection.set(null);
     queueMicrotask(() => this.moveDialogRef()?.nativeElement.showModal());
   }
 
@@ -2312,14 +2826,27 @@ export class ProductosComponent implements OnInit {
     this.moveDialogRef()?.nativeElement.close();
     this.pendingFolderMove = null;
     this.pendingProductMove = null;
+    this.movePickerExcludedIds.set(new Set());
+    this.movePickerSelection.set(null);
   }
 
-  protected confirmMoveTarget(raw: string): void {
-    const carpetaDest = raw === '' ? null : Number(raw);
-    if (raw !== '' && !Number.isFinite(carpetaDest)) {
-      globalThis.alert('Selecciona una carpeta válida');
+  protected movePickerAllowsFolder(id: number): boolean {
+    return !this.movePickerExcludedIds().has(id);
+  }
+
+  protected selectMovePickerTarget(carpetaId: number | null): void {
+    if (carpetaId !== null && this.movePickerExcludedIds().has(carpetaId)) {
       return;
     }
+    this.movePickerSelection.set(carpetaId);
+  }
+
+  protected confirmMoveFromPicker(): void {
+    const carpetaDest = this.movePickerSelection();
+    this.executeMoveToCarpeta(carpetaDest);
+  }
+
+  private executeMoveToCarpeta(carpetaDest: number | null): void {
     const pf = this.pendingFolderMove;
     const pp = this.pendingProductMove;
     if (pf) {
@@ -2336,7 +2863,11 @@ export class ProductosComponent implements OnInit {
       this.api.moverProductoCarpeta(pp.id, carpetaDest).subscribe({
         next: () => {
           this.closeMoveDialog();
-          this.refreshList();
+          if (carpetaDest === null) {
+            this.treeGoTo(null);
+          } else {
+            this.refreshList();
+          }
         },
         error: () => globalThis.alert('No se pudo mover el producto'),
       });
@@ -2364,6 +2895,16 @@ export class ProductosComponent implements OnInit {
     const v = (ev.target as HTMLInputElement).value;
     this.searchTerm.set(v);
     this.search$.next(v);
+  }
+
+  protected onCategoriaFiltroChange(ev: Event): void {
+    const raw = (ev.target as HTMLSelectElement).value;
+    if (raw === '') {
+      this.categoriaFiltro.set(null);
+      return;
+    }
+    const id = Number(raw);
+    this.categoriaFiltro.set(Number.isFinite(id) ? id : null);
   }
 
   protected sortTriggerText(): string {
@@ -2538,7 +3079,7 @@ export class ProductosComponent implements OnInit {
         (p) =>
           p.nombre.toLowerCase().includes(qq) ||
           p.codigo.toLowerCase().includes(qq) ||
-          (p.categoriaNombre?.toLowerCase().includes(qq) ?? false),
+          productoCoincideCategoria(p, qq),
       );
     }
     switch (sort.field) {
@@ -2584,6 +3125,53 @@ export class ProductosComponent implements OnInit {
       return Number(p.precio);
     }
     return dir === 'desc' ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+  }
+
+  private buildSubcarpetasVm(
+    dirs: CarpetaArbolDto[],
+    arbol: CarpetaArbolDto[],
+    allProducts: ProductoDto[],
+  ): CarpetaSubcarpetaVm[] {
+    return dirs.map((d) => {
+      const ids = collectCarpetaSubtreeIds(arbol, d.id);
+      let totalQty = 0;
+      let totalValue = 0;
+      for (const p of allProducts) {
+        const cid = p.carpetaId;
+        if (cid != null && ids.has(cid)) {
+          const c = p.cantidad ?? 0;
+          totalQty += c;
+          totalValue += (p.precio != null ? Number(p.precio) : 0) * c;
+        }
+      }
+      return { ...d, totalQty, totalValue };
+    });
+  }
+
+  private sortSubcarpetas(rows: CarpetaSubcarpetaVm[], sort: SortState): CarpetaSubcarpetaVm[] {
+    const copy = [...rows];
+    switch (sort.field) {
+      case 'name':
+        copy.sort((a, b) => {
+          const c = a.nombre.localeCompare(b.nombre, 'es');
+          return sort.dir === 'asc' ? c : -c;
+        });
+        break;
+      case 'quantity':
+        copy.sort((a, b) =>
+          sort.dir === 'desc' ? b.totalQty - a.totalQty : a.totalQty - b.totalQty,
+        );
+        break;
+      case 'price':
+        copy.sort((a, b) =>
+          sort.dir === 'desc' ? b.totalValue - a.totalValue : a.totalValue - b.totalValue,
+        );
+        break;
+      case 'updated':
+        copy.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        break;
+    }
+    return copy;
   }
 
   protected refreshList(): void {

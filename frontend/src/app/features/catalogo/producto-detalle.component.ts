@@ -1,8 +1,8 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, ElementRef, HostListener, OnInit, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MovimientoStockDto, ProductoDto } from '../../core/models/catalogo.models';
+import { MovimientoStockDto, ProductoDto, CategoriaDto } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
 import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
@@ -48,8 +48,8 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
               </label>
               <div class="pd-hero-meta">
                 <span class="pd-meta-code" title="Código interno">{{ p.codigo }}</span>
-                @if (p.categoriaNombre) {
-                  <span class="pd-meta-pill">{{ p.categoriaNombre }}</span>
+                @for (c of p.categorias; track c.id) {
+                  <span class="pd-meta-pill">{{ c.nombre }}</span>
                 }
                 @if (!p.activo) {
                   <span class="pd-meta-pill pd-meta-pill--warn">Inactivo</span>
@@ -210,11 +210,74 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
                 }
               </div>
               <div class="pd-block">
-                <h3 class="pd-block-title">Etiquetas</h3>
-                @if (p.categoriaNombre) {
-                  <span class="pd-tag">{{ p.categoriaNombre }}</span>
+                <h3 class="pd-block-title">Categorías</h3>
+                @if (p.categorias.length === 0 && !canEditProduct()) {
+                  <p class="pd-block-empty">Sin categorías</p>
                 } @else {
-                  <p class="pd-block-empty">—</p>
+                  <div class="pd-cat-tags">
+                    @for (c of p.categorias; track c.id) {
+                      <span class="pd-tag pd-tag--chip">
+                        <span class="pd-tag-label">{{ c.nombre }}</span>
+                        @if (canEditProduct()) {
+                          <button
+                            type="button"
+                            class="pd-tag-remove"
+                            [disabled]="categoriaSaving()"
+                            [attr.aria-label]="'Quitar categoría ' + c.nombre"
+                            (click)="quitarCategoria(c.id)"
+                          >
+                            <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M14.348 14.849c-0.469 0.469-1.229 0.469-1.697 0l-2.651-3.030-2.651 3.029c-0.469 0.469-1.229 0.469-1.697 0-0.469-0.469-0.469-1.229 0-1.697l2.758-3.15-2.759-3.152c-0.469-0.469-0.469-1.228 0-1.697s1.228-0.469 1.697 0l2.652 3.031 2.651-3.031c0.469-0.469 1.228-0.469 1.697 0s0.469 1.229 0 1.697l-2.758 3.152 2.758 3.15c0.469 0.469 0.469 1.229 0 1.698z"
+                              />
+                            </svg>
+                          </button>
+                        }
+                      </span>
+                    }
+                  </div>
+                }
+                @if (canEditProduct()) {
+                  <div class="pd-cat-combobox" #catCombobox>
+                    <div class="pd-cat-control" (click)="focusCatInput()">
+                      <input
+                        #catInputRef
+                        type="text"
+                        class="pd-cat-combo-input"
+                        placeholder="Buscar o crear categoría…"
+                        [disabled]="categoriaSaving()"
+                        [value]="catInput()"
+                        (input)="onCatInput($event)"
+                        (focus)="catMenuOpen.set(true)"
+                        (keydown)="onCatKeydown($event)"
+                      />
+                    </div>
+                    @if (catMenuOpen() && catSuggestions().length > 0) {
+                      <ul class="pd-cat-menu" role="listbox">
+                        @for (opt of catSuggestions(); track catSuggestionTrack(opt)) {
+                          <li>
+                            <button
+                              type="button"
+                              class="pd-cat-menu-item"
+                              [class.pd-cat-menu-item--create]="opt.kind === 'create'"
+                              role="option"
+                              (mousedown)="selectCatSuggestion(opt); $event.preventDefault()"
+                            >
+                              @if (opt.kind === 'create') {
+                                Crear "{{ opt.nombre }}"
+                              } @else {
+                                {{ opt.categoria!.nombre }}
+                              }
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                    @if (categoriaError()) {
+                      <p class="pd-cat-error" role="alert">{{ categoriaError() }}</p>
+                    }
+                  </div>
                 }
               </div>
               <div class="pd-block">
@@ -327,6 +390,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     :host {
       --pd-bg: var(--story-bg-page, #f8fafc);
       --pd-card: var(--story-surface, #ffffff);
+      --pd-surface: var(--pd-card);
       --pd-border: var(--story-border, #e2e8f0);
       --pd-muted: var(--story-text-muted, #64748b);
       --pd-text: var(--story-text, #1e293b);
@@ -1065,6 +1129,133 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       font-size: 0.9rem;
     }
 
+    .pd-cat-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .pd-tag--chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding-right: 0.25rem;
+    }
+
+    .pd-tag-label {
+      line-height: 1.2;
+    }
+
+    .pd-tag-remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      padding: 0;
+      border: none;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.08);
+      color: inherit;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .pd-tag-remove:hover:not(:disabled) {
+      background: rgba(0, 0, 0, 0.14);
+    }
+
+    .pd-tag-remove:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pd-cat-combobox {
+      position: relative;
+      margin-top: 0.35rem;
+      z-index: 2;
+    }
+
+    .pd-cat-combobox:focus-within {
+      z-index: 50;
+    }
+
+    .pd-cat-control {
+      display: flex;
+      align-items: center;
+      min-height: 2.5rem;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid var(--pd-border);
+      border-radius: 8px;
+      background: var(--pd-card);
+    }
+
+    .pd-cat-combo-input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      font: inherit;
+      color: var(--pd-text);
+      outline: none;
+    }
+
+    .pd-cat-combo-input:disabled {
+      opacity: 0.6;
+    }
+
+    .pd-cat-menu {
+      position: absolute;
+      z-index: 50;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      margin: 0;
+      padding: 0.35rem 0;
+      list-style: none;
+      border: 1px solid var(--pd-border);
+      border-radius: 8px;
+      background: var(--pd-card);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+      max-height: 12rem;
+      overflow-y: auto;
+      isolation: isolate;
+    }
+
+    .pd-cat-menu li {
+      margin: 0;
+      background: var(--pd-card);
+    }
+
+    .pd-cat-menu-item {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: none;
+      background: var(--pd-card);
+      text-align: left;
+      font: inherit;
+      color: var(--pd-text);
+      cursor: pointer;
+    }
+
+    .pd-cat-menu-item:hover,
+    .pd-cat-menu-item:focus-visible {
+      background: var(--pd-primary-soft);
+    }
+
+    .pd-cat-menu-item--create {
+      color: var(--pd-primary);
+      font-weight: 600;
+    }
+
+    .pd-cat-error {
+      margin: 0.35rem 0 0;
+      font-size: 0.8125rem;
+      color: #b42318;
+    }
+
     .pd-notes-edit {
       display: block;
       margin: 0;
@@ -1277,11 +1468,42 @@ export class ProductoDetalleComponent implements OnInit {
   protected readonly editMode = signal(false);
   protected readonly moreMenuOpen = signal(false);
   protected readonly previewUrl = signal<string | null>(null);
+  protected readonly categorias = signal<CategoriaDto[]>([]);
+  protected readonly categoriaSaving = signal(false);
+  protected readonly categoriaError = signal('');
+  protected readonly catInput = signal('');
+  protected readonly catMenuOpen = signal(false);
 
   private file: File | null = null;
   private productId: number | null = null;
   private readonly moreRootRef = viewChild<ElementRef<HTMLElement>>('moreRoot');
   private readonly movDialogRef = viewChild<ElementRef<HTMLDialogElement>>('movDialog');
+  private readonly catInputRef = viewChild<ElementRef<HTMLInputElement>>('catInputRef');
+  private readonly catComboboxRef = viewChild<ElementRef<HTMLElement>>('catCombobox');
+
+  protected readonly catSuggestions = computed(() => {
+    const q = this.catInput().trim().toLowerCase();
+    const assigned = new Set((this.producto()?.categorias ?? []).map((c) => c.id));
+    const available = this.categorias().filter((c) => !assigned.has(c.id));
+    const matches = q
+      ? available.filter((c) => c.nombre.toLowerCase().includes(q))
+      : available;
+
+    type CatSuggestion =
+      | { kind: 'existing'; categoria: CategoriaDto }
+      | { kind: 'create'; nombre: string };
+
+    const opts: CatSuggestion[] = matches.slice(0, 8).map((c) => ({ kind: 'existing', categoria: c }));
+
+    const raw = this.catInput().trim();
+    if (raw) {
+      const exact = available.some((c) => c.nombre.toLowerCase() === raw.toLowerCase());
+      if (!exact) {
+        opts.unshift({ kind: 'create', nombre: raw });
+      }
+    }
+    return opts;
+  });
 
   protected readonly form = this.fb.group({
     nombre: this.fb.nonNullable.control('', Validators.required),
@@ -1296,6 +1518,7 @@ export class ProductoDetalleComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.loadCategorias();
     this.route.paramMap.subscribe((pm) => {
       const raw = pm.get('id');
       const id = raw != null ? Number(raw) : NaN;
@@ -1305,6 +1528,93 @@ export class ProductoDetalleComponent implements OnInit {
       }
       this.productId = id;
       this.loadProduct(id);
+    });
+  }
+
+  private loadCategorias(): void {
+    this.api.getCategorias().subscribe({
+      next: (list) => this.categorias.set(list),
+      error: () => this.categorias.set([]),
+    });
+  }
+
+  protected focusCatInput(): void {
+    this.catInputRef()?.nativeElement.focus();
+    this.catMenuOpen.set(true);
+  }
+
+  protected catSuggestionTrack(
+    opt:
+      | { kind: 'existing'; categoria: CategoriaDto }
+      | { kind: 'create'; nombre: string },
+  ): string {
+    return opt.kind === 'existing' ? `e-${opt.categoria.id}` : `c-${opt.nombre}`;
+  }
+
+  protected onCatInput(ev: Event): void {
+    this.catInput.set((ev.target as HTMLInputElement).value);
+    this.catMenuOpen.set(true);
+    this.categoriaError.set('');
+  }
+
+  protected onCatKeydown(ev: KeyboardEvent): void {
+    if (ev.key === 'Escape') {
+      this.catMenuOpen.set(false);
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      const first = this.catSuggestions()[0];
+      if (first) {
+        this.selectCatSuggestion(first);
+      }
+    }
+  }
+
+  protected selectCatSuggestion(
+    opt:
+      | { kind: 'existing'; categoria: CategoriaDto }
+      | { kind: 'create'; nombre: string },
+  ): void {
+    if (this.productId == null) return;
+    this.categoriaSaving.set(true);
+    this.categoriaError.set('');
+    const payload =
+      opt.kind === 'existing'
+        ? { categoriaId: opt.categoria.id }
+        : { nombre: opt.nombre };
+    this.api.agregarProductoCategoria(this.productId, payload).subscribe({
+      next: (p) => {
+        this.producto.set(p);
+        this.catInput.set('');
+        this.catMenuOpen.set(false);
+        this.categoriaSaving.set(false);
+        if (opt.kind === 'create') {
+          this.loadCategorias();
+        }
+      },
+      error: (err: { error?: { message?: string }; message?: string }) => {
+        this.categoriaSaving.set(false);
+        const msg = err?.error?.message ?? err?.message ?? 'No se pudo añadir la categoría';
+        this.categoriaError.set(typeof msg === 'string' ? msg : 'No se pudo añadir la categoría');
+      },
+    });
+  }
+
+  protected quitarCategoria(categoriaId: number): void {
+    if (this.productId == null) return;
+    this.categoriaSaving.set(true);
+    this.categoriaError.set('');
+    this.api.quitarProductoCategoria(this.productId, categoriaId).subscribe({
+      next: (p) => {
+        this.producto.set(p);
+        this.categoriaSaving.set(false);
+      },
+      error: (err: { error?: { message?: string }; message?: string }) => {
+        this.categoriaSaving.set(false);
+        const msg = err?.error?.message ?? err?.message ?? 'No se pudo quitar la categoría';
+        this.categoriaError.set(typeof msg === 'string' ? msg : 'No se pudo quitar la categoría');
+      },
     });
   }
 
@@ -1464,12 +1774,13 @@ export class ProductoDetalleComponent implements OnInit {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(ev: MouseEvent): void {
-    const root = this.moreRootRef()?.nativeElement;
-    if (root && root.contains(ev.target as Node)) {
-      return;
-    }
-    if (this.moreMenuOpen()) {
+    const moreRoot = this.moreRootRef()?.nativeElement;
+    if (!moreRoot?.contains(ev.target as Node) && this.moreMenuOpen()) {
       this.moreMenuOpen.set(false);
+    }
+    const catRoot = this.catComboboxRef()?.nativeElement;
+    if (!catRoot?.contains(ev.target as Node) && this.catMenuOpen()) {
+      this.catMenuOpen.set(false);
     }
   }
 

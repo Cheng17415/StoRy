@@ -32,6 +32,24 @@ class ProductoSecurityTest {
     }
 
     @Test
+    void listarTodosProductos_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/productos/todos").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listarBajoMinimoQueryParam_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/productos").param("bajoMinimo", "true").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listarBajoMinimoPath_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/productos/bajo-minimo").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void accountMe_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/account/me").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());

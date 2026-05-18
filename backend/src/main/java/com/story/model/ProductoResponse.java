@@ -2,6 +2,7 @@ package com.story.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public record ProductoResponse(
         Long id,
@@ -15,8 +16,7 @@ public record ProductoResponse(
         Instant fechaCreacion,
         Instant fechaActualizacion,
         String imagen,
-        Long categoriaId,
-        String categoriaNombre,
+        List<CategoriaResponse> categorias,
         Long carpetaId,
         String carpetaNombre
 ) {

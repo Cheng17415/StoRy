@@ -7,7 +7,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CategoriaDto, ProductoDto } from '../../core/models/catalogo.models';
+import { CategoriaDto, ProductoDto, formatProductoCategorias } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
 import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
@@ -70,7 +70,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
                   <td>
                     <a [routerLink]="['/producto', p.id]" class="sb-link">{{ p.nombre }}</a>
                   </td>
-                  <td>{{ p.categoriaNombre ?? '—' }}</td>
+                  <td>{{ formatProductoCategorias(p) }}</td>
                   <td class="num">{{ p.cantidad }}</td>
                   <td class="num">{{ p.stockMinimo ?? '—' }}</td>
                   <td class="num sb-deficit">{{ deficit(p) }}</td>
@@ -254,6 +254,8 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
   `,
 })
 export class StockBajoMinimoComponent implements OnInit {
+  protected readonly formatProductoCategorias = formatProductoCategorias;
+
   private readonly api = inject(CatalogoApiService);
   private readonly auth = inject(AuthService);
   private readonly movDialogRef = viewChild<ElementRef<HTMLDialogElement>>('movDialog');

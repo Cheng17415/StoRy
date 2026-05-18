@@ -5,6 +5,7 @@ import com.story.model.MovimientoStock;
 import com.story.model.Producto;
 import com.story.model.TipoMovimiento;
 import com.story.model.Usuario;
+import com.story.repository.CategoriaRepository;
 import com.story.repository.MovimientoStockRepository;
 import com.story.repository.ProductoRepository;
 import com.story.service.CurrentUserService;
@@ -38,6 +39,8 @@ class InventarioServiceRegistrarMovimientoTest {
     private MovimientoStockRepository movimientoStockRepository;
     @Mock
     private ProductoRepository productoRepository;
+    @Mock
+    private CategoriaRepository categoriaRepository;
     @Mock
     private CurrentUserService currentUserService;
 

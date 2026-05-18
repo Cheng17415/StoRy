@@ -13,14 +13,6 @@ Usuario
 - fecha_ultimo_login
 
 
-Perfil
-	-id
-	-perfil
-
-UsuarioPerfil
-	-idUsuario (PK, FK)
-	-idPerfil (PK,FK)
-
 Producto
 - id (PK)
 - nombre

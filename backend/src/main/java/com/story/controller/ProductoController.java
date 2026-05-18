@@ -1,5 +1,6 @@
 package com.story.controller;
 
+import com.story.model.AgregarProductoCategoriaRequest;
 import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.MoverProductoCarpetaRequest;
@@ -43,13 +44,28 @@ public class ProductoController {
     }
 
     @GetMapping
-    public List<ProductoResponse> listar(@RequestParam(required = false) Long carpetaId) {
-        return catalogoService.listarProductos(carpetaId);
+    public List<ProductoResponse> listar(
+            @RequestParam(required = false) Long carpetaId,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false, defaultValue = "false") boolean bajoMinimo) {
+        if (bajoMinimo) {
+            return catalogoService.listarProductosBajoMinimo(categoriaId);
+        }
+        return catalogoService.listarProductos(carpetaId, categoriaId);
     }
 
+    /** Alias legacy; preferir {@code GET /api/productos?bajoMinimo=true}. */
     @GetMapping("/bajo-minimo")
     public List<ProductoResponse> listarBajoMinimo(@RequestParam(required = false) Long categoriaId) {
         return catalogoService.listarProductosBajoMinimo(categoriaId);
+    }
+
+    /**
+     * Catálogo completo de la empresa (todas las carpetas). Debe declararse antes de {@code /{id}}.
+     */
+    @GetMapping("/todos")
+    public List<ProductoResponse> listarTodos() {
+        return catalogoService.listarTodosLosProductosDeLaEmpresa();
     }
 
     /**
@@ -59,16 +75,17 @@ public class ProductoController {
     @GetMapping("/estadisticas")
     public InventarioEstadisticasResponse estadisticasInventario(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(required = false) Long categoriaId) {
         if (desde.isAfter(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
         }
         Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return inventarioService.estadisticas(desdeInstant, hastaInstant);
+        return inventarioService.estadisticas(desdeInstant, hastaInstant, categoriaId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ProductoResponse obtener(@PathVariable Long id) {
         return catalogoService.obtenerProducto(id);
     }
@@ -127,6 +144,20 @@ public class ProductoController {
     @PatchMapping("/{id}/carpeta")
     public ProductoResponse moverCarpeta(@PathVariable Long id, @RequestBody MoverProductoCarpetaRequest body) {
         return catalogoService.moverProductoCarpeta(id, body.carpetaId());
+    }
+
+    @PostMapping("/{id}/categorias")
+    public ProductoResponse agregarCategoria(
+            @PathVariable Long id,
+            @Valid @RequestBody AgregarProductoCategoriaRequest body) {
+        return catalogoService.agregarProductoCategoria(id, body.categoriaId(), body.nombre());
+    }
+
+    @DeleteMapping("/{id}/categorias/{categoriaId}")
+    public ProductoResponse quitarCategoria(
+            @PathVariable Long id,
+            @PathVariable Long categoriaId) {
+        return catalogoService.quitarProductoCategoria(id, categoriaId);
     }
 
     @PostMapping("/{id}/clone")
