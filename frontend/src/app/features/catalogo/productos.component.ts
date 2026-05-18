@@ -215,7 +215,12 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
       <section class="toolbar-strip">
         <div class="search-wrap">
-          <span class="search-icon" aria-hidden="true">⌕</span>
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
           <input
             type="search"
             class="search-input"
@@ -999,14 +1004,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
   `,
   styles: `
     :host {
-      --inv-cta: #b91c1c;
-      --inv-cta-hover: #991b1b;
+      --inv-cta: var(--story-primary);
+      --inv-cta-hover: var(--story-primary-hover);
+      --inv-danger: var(--story-danger);
       --inv-surface: #ffffff;
-      --inv-border: #e8e8e8;
-      --inv-muted: #6b7280;
-      --inv-page: #f3f4f6;
-      --inv-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-      --inv-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.1);
+      --inv-border: #e2e8f0;
+      --inv-border-strong: #cbd5e1;
+      --inv-muted: #64748b;
+      --inv-text: #0f172a;
+      --inv-text-soft: #334155;
+      --inv-page: #f8fafc;
+      --inv-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --inv-shadow-hover: 0 10px 25px rgba(15, 23, 42, 0.08);
+      --inv-focus-ring: 0 0 0 3px var(--story-focus-ring);
       display: block;
     }
 
@@ -1032,16 +1042,16 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       overflow-y: auto;
       overflow-x: hidden;
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 14px;
       background: var(--inv-surface);
       box-shadow: var(--inv-shadow);
     }
 
     .productos-tree-title {
-      padding: 0.65rem 0.75rem;
+      padding: 0.85rem 1rem 0.65rem;
       font-size: 0.7rem;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--inv-muted);
       border-bottom: 1px solid var(--inv-border);
@@ -1057,32 +1067,33 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .tree-row {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       width: 100%;
       text-align: left;
       border: none;
       background: transparent;
       cursor: pointer;
       font: inherit;
-      font-size: 0.875rem;
-      color: #374151;
-      padding: 0.45rem 0.65rem;
-      border-radius: 6px;
+      font-size: 0.88rem;
+      color: var(--inv-text-soft);
+      padding: 0.5rem 0.7rem;
+      border-radius: 8px;
       margin: 0 0.35rem;
       box-sizing: border-box;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .tree-row:hover {
-      background: #f3f4f6;
+      background: #f1f5f9;
     }
 
     .tree-row:focus-visible {
-      outline: 2px solid var(--inv-cta);
-      outline-offset: 2px;
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .tree-row--active {
-      background: #fef2f2;
+      background: rgba(30, 64, 175, 0.08);
       color: var(--inv-cta);
       font-weight: 600;
     }
@@ -1149,10 +1160,10 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .page-title {
       margin: 0;
-      font-size: clamp(1.5rem, 3vw, 1.85rem);
+      font-size: clamp(1.5rem, 3vw, 1.95rem);
       font-weight: 700;
-      letter-spacing: -0.02em;
-      color: #111827;
+      letter-spacing: -0.025em;
+      color: var(--inv-text);
     }
 
     .page-head-actions {
@@ -1166,19 +1177,26 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.55rem 1rem;
-      border-radius: 4px;
-      border: 1px solid var(--inv-border);
+      padding: 0.6rem 1.1rem;
+      border-radius: 10px;
+      border: 1px solid var(--inv-border-strong);
       background: var(--inv-surface);
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
+      transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
     }
 
     .btn-secondary-header:hover {
-      border-color: #d1d5db;
-      background: #f9fafb;
+      border-color: var(--inv-cta);
+      color: var(--inv-cta);
+      background: #ffffff;
+    }
+
+    .btn-secondary-header:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .folder-bc {
@@ -1297,23 +1315,30 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.55rem 1.1rem;
-      border: none;
-      border-radius: 4px;
+      gap: 0.4rem;
+      padding: 0.6rem 1.15rem;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
       background: var(--inv-cta);
-      color: #fff;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+      color: #ffffff;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
       cursor: pointer;
-      transition: background 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: var(--inv-shadow);
+      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.25);
     }
 
     .btn-cta:hover {
       background: var(--inv-cta-hover);
-      box-shadow: var(--inv-shadow-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.32);
+    }
+
+    .btn-cta:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring), 0 6px 18px rgba(30, 64, 175, 0.25);
     }
 
     .toolbar-strip {
@@ -1337,25 +1362,39 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       left: 0.85rem;
       top: 50%;
       transform: translateY(-50%);
-      color: var(--inv-muted);
-      font-size: 1rem;
+      display: inline-flex;
+      color: #94a3b8;
       pointer-events: none;
+      transition: color 0.18s ease;
+    }
+
+    .search-wrap:focus-within .search-icon {
+      color: var(--inv-cta);
     }
 
     .search-input {
       width: 100%;
-      padding: 0.65rem 0.85rem 0.65rem 2.25rem;
-      border: 1px solid var(--inv-border);
+      padding: 0.65rem 0.95rem 0.65rem 2.5rem;
+      border: 1px solid var(--inv-border-strong);
       border-radius: 999px;
       background: var(--inv-surface);
-      font-size: 0.95rem;
+      font-size: 0.92rem;
+      color: var(--inv-text);
       outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .search-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .search-input:hover {
+      border-color: #94a3b8;
     }
 
     .search-input:focus {
-      border-color: #c4c4c4;
-      box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .cat-filter {
@@ -1366,21 +1405,33 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .cat-filter-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+      font-size: 0.72rem;
+      font-weight: 700;
       color: var(--inv-muted);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.06em;
     }
 
     .cat-filter-select {
-      padding: 0.55rem 0.75rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 8px;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       background: var(--inv-surface);
       font: inherit;
       font-size: 0.9rem;
       color: var(--inv-text);
+      cursor: pointer;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .cat-filter-select:hover {
+      border-color: #94a3b8;
+    }
+
+    .cat-filter-select:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .toolbar-right {
@@ -1404,19 +1455,25 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       gap: 0.45rem;
-      padding: 0.45rem 0.65rem 0.45rem 0.85rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 6px;
+      padding: 0.55rem 0.75rem 0.55rem 0.9rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       background: var(--inv-surface);
-      font-size: 0.875rem;
+      font-size: 0.88rem;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
       min-width: 12rem;
       justify-content: space-between;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
 
     .sort-trigger:hover {
-      border-color: #d1d5db;
+      border-color: var(--inv-cta);
+    }
+
+    .sort-trigger:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .sort-trigger-main {
@@ -1433,13 +1490,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .sort-panel {
       position: absolute;
       right: 0;
-      top: calc(100% + 4px);
+      top: calc(100% + 6px);
       min-width: 14rem;
-      padding: 0.35rem 0;
+      padding: 0.4rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
       z-index: 20;
     }
 
@@ -1449,17 +1506,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       justify-content: space-between;
       width: 100%;
       gap: 0.75rem;
-      padding: 0.55rem 1rem;
+      padding: 0.55rem 0.75rem;
       border: none;
+      border-radius: 8px;
       background: transparent;
       font-size: 0.9rem;
       cursor: pointer;
-      color: var(--inv-muted);
+      color: var(--inv-text-soft);
       text-align: left;
+      transition: background 0.12s ease;
     }
 
     .sort-option:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .sort-option.active {
@@ -1489,17 +1548,22 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       width: 2.5rem;
       height: 2.5rem;
       padding: 0;
-      border: 1px solid #4b5563;
-      border-radius: 8px;
-      background: #374151;
-      color: #fff;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
+      background: var(--inv-surface);
+      color: var(--inv-text-soft);
       cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
     }
 
     .layout-trigger:hover {
-      background: #4b5563;
-      border-color: #6b7280;
+      border-color: var(--inv-cta);
+      color: var(--inv-cta);
+    }
+
+    .layout-trigger:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .layout-trigger-icon {
@@ -1513,11 +1577,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       right: 0;
       top: calc(100% + 6px);
       min-width: 12.5rem;
-      padding: 0.5rem 0 0.35rem;
+      padding: 0.5rem 0.4rem 0.4rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
       z-index: 25;
     }
 
@@ -1535,22 +1599,24 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       align-items: center;
       gap: 0.65rem;
       width: 100%;
-      padding: 0.55rem 0.85rem;
+      padding: 0.55rem 0.75rem;
       border: none;
+      border-radius: 8px;
       background: transparent;
       font-size: 0.9rem;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--inv-text-soft);
       text-align: left;
+      transition: background 0.12s ease;
     }
 
     .layout-option:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .layout-option.active {
-      background: #f3f4f6;
-      color: #111827;
+      background: rgba(30, 64, 175, 0.08);
+      color: var(--inv-cta);
       font-weight: 600;
     }
 
@@ -1585,17 +1651,18 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .stat-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+      font-size: 0.72rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.06em;
       color: var(--inv-muted);
     }
 
     .stat-value {
-      font-size: 1.05rem;
+      font-size: 1.15rem;
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
+      letter-spacing: -0.01em;
     }
 
     .loading,
@@ -1619,11 +1686,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .product-card {
       background: var(--inv-surface);
-      border-radius: 10px;
+      border-radius: 14px;
       overflow: visible;
       border: 1px solid var(--inv-border);
       box-shadow: var(--inv-shadow);
-      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
     }
 
     /** Encima de la tarjeta/fila siguiente cuando el menú ⋮ está abierto (evita que tape el dropdown) */
@@ -1641,13 +1708,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .product-card--click:hover {
       box-shadow: var(--inv-shadow-hover);
       transform: translateY(-2px);
+      border-color: var(--inv-border-strong);
     }
 
     .card-image-wrap {
       position: relative;
       aspect-ratio: 4 / 3;
       background: #eceef1;
-      border-radius: 10px 10px 0 0;
+      border-radius: 14px 14px 0 0;
       overflow: hidden;
     }
 
@@ -1738,11 +1806,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       top: calc(100% + 4px);
       right: 0;
       min-width: 11rem;
-      padding: 0.35rem 0;
+      padding: 0.35rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 0 1px rgba(15, 23, 42, 0.08);
       z-index: 30;
     }
 
@@ -1760,21 +1828,27 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .card-dd-item {
       display: block;
       width: 100%;
-      padding: 0.5rem 0.85rem;
+      padding: 0.55rem 0.75rem;
       border: none;
       background: transparent;
+      border-radius: 8px;
       font-size: 0.88rem;
       text-align: left;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
+      transition: background 0.12s ease;
     }
 
     .card-dd-item:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .card-dd-item.danger {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
+    }
+
+    .card-dd-item.danger:hover {
+      background: rgba(185, 28, 28, 0.08);
     }
 
     .card-sep {
@@ -1893,7 +1967,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.95rem;
       font-weight: 700;
       line-height: 1.3;
-      color: #111827;
+      color: var(--inv-text);
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -1901,7 +1975,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .card-title.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .card-meta {
@@ -1929,7 +2003,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .card-price {
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .product-list {
@@ -1943,12 +2017,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       flex-wrap: wrap;
       align-items: center;
       gap: 0.85rem 1rem;
-      padding: 0.75rem 0.85rem;
+      padding: 0.85rem 1rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: var(--inv-shadow);
       cursor: pointer;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .product-list-row:hover {
+      border-color: var(--inv-border-strong);
+      box-shadow: var(--inv-shadow-hover);
+      transform: translateY(-1px);
     }
 
     .list-thumb {
@@ -1988,11 +2069,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.95rem;
       font-weight: 700;
       line-height: 1.3;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .list-title.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .list-meta {
@@ -2020,7 +2101,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .list-price {
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .list-actions {
@@ -2063,13 +2144,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.875rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 14px;
       overflow: visible;
       box-shadow: var(--inv-shadow);
     }
 
     .product-table thead {
-      background: #f9fafb;
+      background: #f8fafc;
       border-bottom: 1px solid var(--inv-border);
     }
 
@@ -2094,7 +2175,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .product-table tbody tr:hover {
-      background: #fafafa;
+      background: #f8fafc;
     }
 
     .col-thumb {
@@ -2141,12 +2222,12 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .td-name {
       font-weight: 600;
-      color: #111827;
+      color: var(--inv-text);
       max-width: 14rem;
     }
 
     .td-name.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .td-code {
@@ -2157,13 +2238,17 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .td-price {
       font-weight: 600;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .td-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
+    }
+
+    tr.product-table-row {
+      transition: background 0.15s ease;
     }
 
     .table-action-btn {
@@ -2183,19 +2268,21 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .row-stock-bajo {
-      background: #fff5f5;
+      background: rgba(185, 28, 28, 0.04);
     }
 
     .modal {
       border: none;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 0;
       max-width: 26rem;
       width: calc(100vw - 2rem);
+      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
     }
 
     .modal::backdrop {
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(2px);
     }
 
     .modal-inner {
@@ -2226,12 +2313,22 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     input[type='text'],
     input[type='number'],
     textarea {
-      padding: 0.5rem 0.6rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       font: inherit;
       resize: vertical;
       min-height: 4rem;
+      background: #ffffff;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    input[type='text']:focus,
+    input[type='number']:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .photo-field {
@@ -2316,33 +2413,61 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .btn-secondary {
-      padding: 0.5rem 0.95rem;
-      border-radius: 6px;
-      border: 1px solid var(--inv-border);
-      background: #fff;
+      padding: 0.6rem 1.05rem;
+      border-radius: 10px;
+      border: 1px solid var(--inv-border-strong);
+      background: #ffffff;
       cursor: pointer;
-      font-weight: 500;
+      font-weight: 600;
+      color: var(--inv-text-soft);
+      transition: border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
     }
 
     .btn-submit {
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 6px;
+      padding: 0.6rem 1.1rem;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
       background: var(--inv-cta);
       color: #fff;
       font-weight: 600;
       cursor: pointer;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.22);
+      transition: background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--inv-cta-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
+    }
+
+    .btn-submit:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .btn-submit:disabled {
       opacity: 0.55;
       cursor: not-allowed;
+      box-shadow: none;
     }
 
     .error {
-      color: #b00020;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--inv-danger);
       font-size: 0.85rem;
       margin: 0;
+      padding: 0.55rem 0.7rem;
+      background: rgba(185, 28, 28, 0.07);
+      border: 1px solid rgba(185, 28, 28, 0.2);
+      border-radius: 8px;
     }
   `,
 })

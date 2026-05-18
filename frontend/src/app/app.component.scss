@@ -103,10 +103,15 @@ nav a.active {
 
 .user-avatar-ring {
   display: inline-flex;
-  padding: 2px;
+  padding: 0;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--story-secondary), var(--story-accent));
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  transition: box-shadow 0.18s ease;
+}
+
+.user-menu-trigger:hover .user-avatar-ring {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 .user-avatar-img {
@@ -115,7 +120,7 @@ nav a.active {
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--story-border);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .user-dropdown {
