@@ -340,17 +340,7 @@ function pathToFolder(nodes: CarpetaArbolDto[], targetId: number): { id: number;
           </div>
         </section>
 
-        @if (vm.pageData.items.length === 0) {
-          <p class="empty-hint">
-            @if (searchTerm().trim()) {
-              No hay resultados para esta búsqueda.
-            } @else if (vm.subcarpetas.length > 0) {
-              No hay productos en esta carpeta. Pulsa «Añadir producto» o entra en una subcarpeta.
-            } @else {
-              No hay productos. Pulsa «Añadir producto» para crear el primero.
-            }
-          </p>
-        } @else {
+        @if (data.items.length !== 0){
           @switch (layoutMode()) {
             @case ('grid') {
               <div class="card-grid">

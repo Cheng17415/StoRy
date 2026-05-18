@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import {
   CarpetaArbolDto,
   CarpetaDto,
+  InventarioEstadisticasDto,
   CategoriaDto,
   ClonarCarpetaResponseDto,
   MovimientoStockDto,
@@ -153,6 +154,12 @@ export class CatalogoApiService {
 
   getProductoMovimientos(id: number): Observable<MovimientoStockDto[]> {
     return this.http.get<MovimientoStockDto[]>(`/api/productos/${id}/movimientos`, this.authBearerOpts());
+  }
+
+  getInventarioEstadisticas(desde: string, hasta: string): Observable<InventarioEstadisticasDto> {
+    return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
+      params: { desde, hasta },
+    });
   }
 
   createProducto(payload: ProductoFormPayload): Observable<ProductoDto> {

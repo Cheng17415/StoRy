@@ -3,6 +3,12 @@
   min-height: 100vh;
 }
 
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .app-header {
   display: flex;
   align-items: center;
@@ -201,7 +207,48 @@ a.user-dropdown-item {
 }
 
 .app-main {
+  flex: 1;
   padding: 1rem 1.25rem;
   background: var(--story-bg-page);
-  min-height: calc(100vh - 4rem);
+}
+
+.app-footer {
+  margin-top: auto;
+  padding: 0.85rem 1.25rem;
+  background: var(--story-bg-header);
+  color: rgba(255, 255, 255, 0.88);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.875rem;
+}
+
+.app-footer-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+  text-align: center;
+}
+
+.app-footer-name {
+  font-weight: 600;
+  color: #fff;
+}
+
+.app-footer-sep {
+  color: rgba(255, 255, 255, 0.45);
+  user-select: none;
+}
+
+.app-footer-contact {
+  color: var(--story-secondary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.app-footer-contact:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }

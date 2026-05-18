@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Inicia el backend Spring Boot (perfil dev por defecto).
+# Uso: ./scripts/start-backend.sh  (desde cualquier directorio)
+# Si existe .env en la raíz del repo, carga variables en este proceso (p. ej. GOOGLE_CLIENT_ID).
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$REPO_ROOT/.env"
+
+load_dotenv() {
+  local env_path="$1"
+  [[ -f "$env_path" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ "$line" != *"="* ]] && continue
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    key="${key%"${key##*[![:space:]]}"}"
+    key="${key#"${key%%[![:space:]]*}"}"
+    [[ -z "$key" ]] && continue
+    val="${val#"${val%%[![:space:]]*}"}"
+    val="${val%"${val##*[![:space:]]}"}"
+    if [[ ${#val} -ge 2 ]]; then
+      local fc="${val:0:1}"
+      local lc="${val:$((${#val}-1)):1}"
+      if [[ ( "$fc" == '"' && "$lc" == '"' ) || ( "$fc" == "'" && "$lc" == "'" ) ]]; then
+        val="${val:1:$((${#val}-2))}"
+      fi
+    fi
+    export "${key}=${val}"
+  done < "$env_path"
+}
+
+load_dotenv "$ENV_FILE"
+
+# macOS Homebrew installa OpenJDK 17 como "keg-only" (sin java en PATH). El proyecto usa Java 17 (pom.xml).
+if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]] && ! command -v java >/dev/null 2>&1; then
+  for jdk in "/opt/homebrew/opt/openjdk@17" "/usr/local/opt/openjdk@17"; do
+    if [[ -x "${jdk}/bin/java" ]]; then
+      export JAVA_HOME="$jdk"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+      break
+    fi
+  done
+fi
+
+BACKEND_DIR="$(cd "$SCRIPT_DIR/../backend" && pwd)"
+cd "$BACKEND_DIR"
+echo "Directorio: $BACKEND_DIR"
+exec ./mvnw spring-boot:run "$@"

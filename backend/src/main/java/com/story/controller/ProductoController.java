@@ -1,11 +1,13 @@
 package com.story.controller;
 
+import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.MoverProductoCarpetaRequest;
 import com.story.model.ProductoResponse;
 import com.story.model.RegistrarMovimientoRequest;
 import com.story.service.CatalogoService;
 import com.story.service.InventarioService;
+import org.springframework.format.annotation.DateTimeFormat;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,8 +22,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @RestController
@@ -44,6 +50,22 @@ public class ProductoController {
     @GetMapping("/bajo-minimo")
     public List<ProductoResponse> listarBajoMinimo(@RequestParam(required = false) Long categoriaId) {
         return catalogoService.listarProductosBajoMinimo(categoriaId);
+    }
+
+    /**
+     * Estadísticas de movimientos de stock por periodo (misma autenticación que el resto de {@code /api/productos}).
+     * Autorización de rol en {@link InventarioService#estadisticas}.
+     */
+    @GetMapping("/estadisticas")
+    public InventarioEstadisticasResponse estadisticasInventario(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        if (desde.isAfter(hasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
+        }
+        Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return inventarioService.estadisticas(desdeInstant, hastaInstant);
     }
 
     @GetMapping("/{id}")
