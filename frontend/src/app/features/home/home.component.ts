@@ -11,42 +11,42 @@ import { RouterLink } from '@angular/router';
         <div class="hero-copy">
           <span class="eyebrow">
             <span class="dot" aria-hidden="true"></span>
-            Inventory, made calm
+            Inventario, sin estrés
           </span>
           <h1 id="landing-title">
-            Your stock,<br />
-            <span class="accent">in one clear place.</span>
+            Tu stock,<br />
+            <span class="accent">en un solo sitio claro.</span>
           </h1>
           <p class="lede">
-            Track products, folders and every stock movement across your team — without the spreadsheet chaos.
+            Controla productos, carpetas y cada movimiento de stock con tu equipo — sin el caos de las hojas de cálculo.
           </p>
           <div class="hero-cta">
             <a routerLink="/register" class="btn-primary">
-              Get started — it's free
+              Empezar — es gratis
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 5l7 7-7 7" />
               </svg>
             </a>
-            <a routerLink="/login" class="btn-ghost">I already have an account</a>
+            <a routerLink="/login" class="btn-ghost">Ya tengo cuenta</a>
           </div>
           <ul class="hero-trust">
             <li>
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
               </svg>
-              No credit card
+              Sin tarjeta
             </li>
             <li>
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
               </svg>
-              Google sign-in
+              Acceso con Google
             </li>
             <li>
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
               </svg>
-              Multi-user roles
+              Roles por equipo
             </li>
           </ul>
         </div>
@@ -57,23 +57,23 @@ import { RouterLink } from '@angular/router';
               <div class="mock-dots">
                 <span></span><span></span><span></span>
               </div>
-              <div class="mock-title">StoRy · Inventory</div>
+              <div class="mock-title">StoRy · Inventario</div>
             </div>
 
             <div class="mock-body">
               <div class="mock-kpis">
                 <div class="kpi">
-                  <span class="kpi-label">Products</span>
+                  <span class="kpi-label">Productos</span>
                   <span class="kpi-value">248</span>
                   <span class="kpi-delta up">+12</span>
                 </div>
                 <div class="kpi">
-                  <span class="kpi-label">Movements (7d)</span>
+                  <span class="kpi-label">Movim. (7d)</span>
                   <span class="kpi-value">1.4k</span>
                   <span class="kpi-delta up">+8%</span>
                 </div>
                 <div class="kpi">
-                  <span class="kpi-label">Low stock</span>
+                  <span class="kpi-label">Bajo stock</span>
                   <span class="kpi-value">6</span>
                   <span class="kpi-delta down">−3</span>
                 </div>
@@ -92,7 +92,7 @@ import { RouterLink } from '@angular/router';
               <ul class="mock-list">
                 <li>
                   <span class="dotg in"></span>
-                  <span class="row-name">Box A-204</span>
+                  <span class="row-name">Caja A-204</span>
                   <span class="row-tag">+24</span>
                 </li>
                 <li>
@@ -102,7 +102,7 @@ import { RouterLink } from '@angular/router';
                 </li>
                 <li>
                   <span class="dotg in"></span>
-                  <span class="row-name">Screwdriver Set</span>
+                  <span class="row-name">Juego de destornilladores</span>
                   <span class="row-tag">+12</span>
                 </li>
               </ul>
@@ -115,7 +115,7 @@ import { RouterLink } from '@angular/router';
       </section>
 
       <section class="features" aria-labelledby="features-title">
-        <h2 id="features-title" class="section-title">Everything inventory needs.<span> Nothing it doesn't.</span></h2>
+        <h2 id="features-title" class="section-title">Todo lo que tu inventario necesita.<span> Nada de relleno.</span></h2>
 
         <ul class="feature-grid">
           <li class="feature-card">
@@ -124,8 +124,8 @@ import { RouterLink } from '@angular/router';
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
               </svg>
             </div>
-            <h3>Catalog & folders</h3>
-            <p>Organize products in a tree of folders, with codes, prices and images per company.</p>
+            <h3>Catálogo y carpetas</h3>
+            <p>Organiza tus productos en un árbol de carpetas con códigos, precios e imágenes por empresa.</p>
           </li>
 
           <li class="feature-card">
@@ -134,8 +134,8 @@ import { RouterLink } from '@angular/router';
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 17V9M12 17V5M17 17v-6M3 21h18" />
               </svg>
             </div>
-            <h3>Live stock movements</h3>
-            <p>Every quantity change becomes an entry, exit or adjustment — automatically traced to a user.</p>
+            <h3>Movimientos al instante</h3>
+            <p>Cada cambio de cantidad se registra como entrada, salida o ajuste, con el usuario que lo hizo.</p>
           </li>
 
           <li class="feature-card">
@@ -144,8 +144,8 @@ import { RouterLink } from '@angular/router';
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
-            <h3>Team & roles</h3>
-            <p>Invite admins, employees and analytics viewers. Each role sees exactly what it needs.</p>
+            <h3>Equipo y roles</h3>
+            <p>Invita administradores, empleados y analistas. Cada rol ve justo lo que necesita.</p>
           </li>
 
           <li class="feature-card">
@@ -154,41 +154,32 @@ import { RouterLink } from '@angular/router';
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 14l4-4 4 4 6-6" />
               </svg>
             </div>
-            <h3>Insights that matter</h3>
-            <p>Totals, daily series and top movers — filtered by date range or category.</p>
+            <h3>Estadísticas útiles</h3>
+            <p>Totales, evolución diaria y productos más movidos, filtrados por fecha o categoría.</p>
           </li>
         </ul>
       </section>
 
       <section class="steps" aria-labelledby="steps-title">
-        <h2 id="steps-title" class="section-title">From zero to tracked in 3 steps.</h2>
+        <h2 id="steps-title" class="section-title">De cero a controlado en 3 pasos.</h2>
 
         <ol class="step-list">
           <li class="step">
             <span class="step-num">1</span>
-            <h3>Create your company</h3>
-            <p>Sign up and spin up a workspace — pick your currency and you're in.</p>
+            <h3>Crea tu empresa</h3>
+            <p>Regístrate y monta tu espacio de trabajo — elige tu moneda y dentro.</p>
           </li>
           <li class="step">
             <span class="step-num">2</span>
-            <h3>Add products & folders</h3>
-            <p>Build your catalog the way your warehouse actually looks.</p>
+            <h3>Añade productos y carpetas</h3>
+            <p>Estructura tu catálogo tal como está tu almacén en la vida real.</p>
           </li>
           <li class="step">
             <span class="step-num">3</span>
-            <h3>Track every movement</h3>
-            <p>Update quantities — StoRy logs it for you and surfaces the trends.</p>
+            <h3>Registra cada movimiento</h3>
+            <p>Actualiza cantidades: StoRy lo apunta por ti y te enseña la tendencia.</p>
           </li>
         </ol>
-      </section>
-
-      <section class="cta-final" aria-labelledby="cta-final-title">
-        <h2 id="cta-final-title">Ready to put your inventory in order?</h2>
-        <p>Two minutes to sign up. Zero spreadsheets harmed.</p>
-        <div class="hero-cta">
-          <a routerLink="/register" class="btn-primary">Create your workspace</a>
-          <a routerLink="/login" class="btn-ghost">Sign in</a>
-        </div>
       </section>
     </div>
   `,
@@ -675,35 +666,6 @@ import { RouterLink } from '@angular/router';
       font-size: 0.92rem;
       line-height: 1.55;
       color: #475569;
-    }
-
-    /* ---------- FINAL CTA ---------- */
-    .cta-final {
-      text-align: center;
-      padding: 2.5rem 1.5rem;
-      background:
-        radial-gradient(600px 200px at 50% 0%, rgba(30, 64, 175, 0.12), transparent 70%),
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-      border: 1px solid var(--story-border);
-      border-radius: 20px;
-    }
-
-    .cta-final h2 {
-      margin: 0 0 0.5rem;
-      font-size: clamp(1.4rem, 2.6vw, 1.9rem);
-      font-weight: 700;
-      letter-spacing: -0.015em;
-      color: #0f172a;
-    }
-
-    .cta-final p {
-      margin: 0 0 1.25rem;
-      color: #475569;
-      font-size: 1rem;
-    }
-
-    .cta-final .hero-cta {
-      justify-content: center;
     }
 
     /* ---------- RESPONSIVE ---------- */
