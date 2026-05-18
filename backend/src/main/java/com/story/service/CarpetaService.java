@@ -32,20 +32,17 @@ public class CarpetaService {
     private final ProductoRepository productoRepository;
     private final CatalogoService catalogoService;
     private final CurrentUserService currentUserService;
-    private final FileStorageService fileStorageService;
 
     public CarpetaService(
             ProductoCarpetaRepository productoCarpetaRepository,
             ProductoRepository productoRepository,
             CatalogoService catalogoService,
-            CurrentUserService currentUserService,
-            FileStorageService fileStorageService
+            CurrentUserService currentUserService
     ) {
         this.productoCarpetaRepository = productoCarpetaRepository;
         this.productoRepository = productoRepository;
         this.catalogoService = catalogoService;
         this.currentUserService = currentUserService;
-        this.fileStorageService = fileStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -66,11 +63,11 @@ public class CarpetaService {
         Long parentId = c.getParent() != null ? c.getParent().getId() : null;
         List<ProductoCarpeta> kids = byParent.getOrDefault(c.getId(), List.of());
         List<CarpetaArbolResponse> hijos = kids.stream().map(ch -> toArbol(ch, byParent)).toList();
-        return new CarpetaArbolResponse(c.getId(), c.getNombre(), parentId, c.getDescripcion(), c.getImagen(), hijos);
+        return new CarpetaArbolResponse(c.getId(), c.getNombre(), parentId, c.getDescripcion(), hijos);
     }
 
     @Transactional
-    public CarpetaResponse crear(String nombre, Long parentId, String descripcionRaw, String imagenBase64) {
+    public CarpetaResponse crear(String nombre, Long parentId, String descripcionRaw) {
         currentUserService.requireRoleAtLeastEmployee();
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre es obligatorio");
@@ -86,7 +83,6 @@ public class CarpetaService {
         }
         c.setNombre(nombre.trim());
         c.setDescripcion(normalizeDescripcion(descripcionRaw));
-        c.setImagen(fileStorageService.storeImageBase64(imagenBase64));
         Instant now = Instant.now();
         c.setFechaCreacion(now);
         c.setFechaActualizacion(now);
@@ -148,9 +144,6 @@ public class CarpetaService {
         ProductoCarpeta carpeta = productoCarpetaRepository.findByIdAndCompany_Id(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
         Set<Long> subtree = collectSubtreeIds(companyId, id);
-        for (ProductoCarpeta fc : productoCarpetaRepository.findAllById(subtree)) {
-            fileStorageService.deleteIfStored(fc.getImagen());
-        }
         List<Producto> productos = productoRepository.findAllByCompany_IdAndCarpeta_IdIn(companyId, subtree);
         for (Producto p : productos) {
             catalogoService.eliminarProductoSinChequeoAdmin(p);
@@ -188,7 +181,6 @@ public class CarpetaService {
         nueva.setParent(nuevoPadre);
         nueva.setNombre(origen.getNombre());
         nueva.setDescripcion(origen.getDescripcion());
-        nueva.setImagen(fileStorageService.copyIfStored(origen.getImagen()));
         Instant now = Instant.now();
         nueva.setFechaCreacion(now);
         nueva.setFechaActualizacion(now);
@@ -225,6 +217,6 @@ public class CarpetaService {
 
     private CarpetaResponse toResponse(ProductoCarpeta c) {
         Long parentId = c.getParent() != null ? c.getParent().getId() : null;
-        return new CarpetaResponse(c.getId(), c.getNombre(), parentId, c.getDescripcion(), c.getImagen());
+        return new CarpetaResponse(c.getId(), c.getNombre(), parentId, c.getDescripcion());
     }
 }

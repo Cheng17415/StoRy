@@ -7,6 +7,10 @@ app:
     client-id: ${GOOGLE_CLIENT_ID:}
   upload:
     dir: ${APP_UPLOAD_DIR:${user.home}/.story/uploads}
+  supabase:
+    url: ${SUPABASE_URL:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+    bucket: ${SUPABASE_STORAGE_BUCKET:imagenes}
   resend:
     api-key: ${RESEND_API_KEY:}
     from: ${RESEND_FROM:}

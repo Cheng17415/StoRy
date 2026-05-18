@@ -6,6 +6,10 @@ app:
     client-id: ""
   upload:
     dir: ${java.io.tmpdir}/story-test-uploads
+  supabase:
+    url: https://example.supabase.co
+    service-role-key: test-service-role-key
+    bucket: imagenes
 
 spring:
   datasource:

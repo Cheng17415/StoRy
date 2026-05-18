@@ -357,18 +357,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-card product-card--click folder-card" (click)="enterFolder(d, $event)">
                     <div class="card-image-wrap">
-                      @if (d.imagen) {
-                        <img [src]="d.imagen" [alt]="d.nombre" class="card-image" />
-                      } @else {
-                        <div class="card-placeholder card-placeholder--folder" aria-hidden="true">
+                      <div class="card-placeholder card-placeholder--folder" aria-hidden="true">
                           <svg class="folder-placeholder-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path
                               fill="currentColor"
                               d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                             />
                           </svg>
-                        </div>
-                      }
+                      </div>
                     </div>
                     <div class="card-body">
                       <div class="card-title-row">
@@ -523,18 +519,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-list-row folder-list-row" (click)="enterFolder(d, $event)">
                     <div class="list-thumb">
-                      @if (d.imagen) {
-                        <img [src]="d.imagen" [alt]="''" class="list-thumb-img" />
-                      } @else {
-                        <div class="list-thumb-placeholder list-thumb-placeholder--folder" aria-hidden="true">
+                      <div class="list-thumb-placeholder list-thumb-placeholder--folder" aria-hidden="true">
                           <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
                             <path
                               fill="currentColor"
                               d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                             />
                           </svg>
-                        </div>
-                      }
+                      </div>
                     </div>
                     <div class="list-main">
                       <h2 class="list-title">{{ d.nombre }}</h2>
@@ -709,18 +701,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     @for (d of vm.subcarpetas; track d.id) {
                       <tr class="product-table-row folder-table-row" (click)="enterFolder(d, $event)">
                         <td class="td-thumb">
-                          @if (d.imagen) {
-                            <img [src]="d.imagen" [alt]="''" class="table-thumb-img" />
-                          } @else {
-                            <div class="table-thumb-ph table-thumb-ph--folder" aria-hidden="true">
+                          <div class="table-thumb-ph table-thumb-ph--folder" aria-hidden="true">
                               <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
                                 <path
                                   fill="currentColor"
                                   d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                                 />
                               </svg>
-                            </div>
-                          }
+                          </div>
                         </td>
                         <td class="td-name">{{ d.nombre }}</td>
                         <td class="td-code">—</td>
@@ -943,87 +931,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           <label>
             Notas (opcional)
             <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre el producto"></textarea>
-          </label>
-          <label class="photo-field">
-            <span class="photo-field-label">Foto</span>
-            <div class="photo-upload">
-              <div class="photo-upload-inner">
-                <svg
-                  class="photo-upload-icon"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
-                  />
-                </svg>
-                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
-              </div>
-              <input
-                type="file"
-                class="photo-upload-input"
-                aria-label="Subir foto del producto"
-                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
-                (change)="onFile($event)"
-              />
-            </div>
-          </label>
-          @if (formError()) {
-            <p class="error">{{ formError() }}</p>
-          }
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" (click)="closeDialog()">Cancelar</button>
-            <button type="submit" class="btn-submit" [disabled]="form.invalid || saving()">Guardar</button>
-          </div>
-        </form>
-      </div>
-    </dialog>
-
-    <dialog #folderDialog class="modal" (cancel)="$event.preventDefault()">
-      <div class="modal-inner">
-        <h3>Nueva carpeta</h3>
-        <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
-          <label>
-            Nombre
-            <input type="text" formControlName="nombre" />
-          </label>
-          <label>
-            Notas (opcional)
-            <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre la carpeta"></textarea>
-          </label>
-          <label class="photo-field">
-            <span class="photo-field-label">Foto</span>
-            <div class="photo-upload">
-              <div class="photo-upload-inner">
-                <svg
-                  class="photo-upload-icon"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
-                  />
-                </svg>
-                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
-              </div>
-              <input
-                type="file"
-                class="photo-upload-input"
-                aria-label="Subir foto de la carpeta"
-                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
-                (change)="onFolderFile($event)"
-              />
-            </div>
           </label>
           @if (folderFormError()) {
             <p class="error">{{ folderFormError() }}</p>
@@ -2557,7 +2464,6 @@ export class ProductosComponent implements OnInit {
 
   protected readonly folderFormError = signal('');
   protected readonly folderSaving = signal(false);
-  private folderFile: File | null = null;
 
   protected readonly folderForm = this.fb.group({
     nombre: this.fb.nonNullable.control('', Validators.required),
@@ -2673,18 +2579,12 @@ export class ProductosComponent implements OnInit {
       return;
     }
     this.folderForm.reset({ nombre: '', descripcion: '' });
-    this.folderFile = null;
     this.folderFormError.set('');
     queueMicrotask(() => this.folderDialogRef()?.nativeElement.showModal());
   }
 
   protected closeFolderDialog(): void {
     this.folderDialogRef()?.nativeElement.close();
-  }
-
-  protected onFolderFile(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    this.folderFile = input.files?.[0] ?? null;
   }
 
   protected saveFolder(): void {
@@ -2703,7 +2603,6 @@ export class ProductosComponent implements OnInit {
       .crearCarpeta({
         nombre,
         descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
-        imagen: this.folderFile,
         ...(parentId != null ? { parentId } : {}),
       })
       .subscribe({
