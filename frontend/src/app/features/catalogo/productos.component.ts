@@ -995,12 +995,39 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             Notas (opcional)
             <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre el producto"></textarea>
           </label>
+          @if (formError()) {
+            <p class="error">{{ formError() }}</p>
+          }
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="closeDialog()">Cancelar</button>
+            <button type="submit" class="btn-submit" [disabled]="form.invalid || saving()">
+              {{ saving() ? 'Guardando…' : 'Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog #folderDialog class="modal" (cancel)="$event.preventDefault()">
+      <div class="modal-inner">
+        <h3>Nueva carpeta</h3>
+        <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
+          <label>
+            Nombre
+            <input type="text" formControlName="nombre" />
+          </label>
+          <label>
+            Notas (opcional)
+            <textarea formControlName="descripcion" rows="3" placeholder="Descripción de la carpeta"></textarea>
+          </label>
           @if (folderFormError()) {
             <p class="error">{{ folderFormError() }}</p>
           }
           <div class="modal-actions">
             <button type="button" class="btn-secondary" (click)="closeFolderDialog()">Cancelar</button>
-            <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">Guardar</button>
+            <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">
+              {{ folderSaving() ? 'Guardando…' : 'Guardar' }}
+            </button>
           </div>
         </form>
       </div>
