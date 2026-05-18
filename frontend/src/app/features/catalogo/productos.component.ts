@@ -1450,19 +1450,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       align-items: center;
       justify-content: center;
       gap: 0.45rem;
-      height: 2.5rem;
-      padding: 0 1.05rem;
+      height: 2.35rem;
+      padding: 0 0.95rem;
       border: 1px solid var(--inv-cta);
       border-radius: 10px;
-      background: linear-gradient(180deg, var(--story-secondary) 0%, var(--inv-cta) 100%);
+      background: var(--inv-cta);
       color: #ffffff;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 600;
       letter-spacing: 0;
       text-transform: none;
       cursor: pointer;
       transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.05s ease;
-      box-shadow: 0 6px 18px rgba(30, 64, 175, 0.28);
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
     }
 
     .btn-cta:active {
@@ -1472,12 +1472,12 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .btn-cta:hover {
       background: var(--inv-cta-hover);
       border-color: var(--inv-cta-hover);
-      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.32);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
     }
 
     .btn-cta:focus-visible {
       outline: none;
-      box-shadow: var(--inv-focus-ring), 0 6px 18px rgba(30, 64, 175, 0.25);
+      box-shadow: var(--inv-focus-ring), 0 4px 12px rgba(30, 64, 175, 0.25);
     }
 
     .toolbar-strip {
