@@ -36,11 +36,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()
-                        .requestMatchers("/api/account/**").authenticated()
-                        .requestMatchers("/api/company/**").authenticated()
-                        .requestMatchers("/api/categorias", "/api/categorias/**").authenticated()
-                        .requestMatchers("/api/productos/**").authenticated()
-                        .requestMatchers("/api/carpetas", "/api/carpetas/**").authenticated()
+                        // Una sola regla ant-style para /api/** evita 401 en subrutas y query params
+                        // (p. ej. /api/productos/todos, /api/productos?bajoMinimo=true) con matchers MVC.
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

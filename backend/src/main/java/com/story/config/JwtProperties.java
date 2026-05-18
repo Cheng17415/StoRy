@@ -8,7 +8,7 @@ public class JwtProperties {
     /**
      * HMAC secret; must be at least 256 bits (32 bytes) for HS256.
      */
-    private String secret = "01234567890123456789012345678901";
+    private String secret = "01234567890123456789012345678901devsecret";
 
     private long expirationMs = 86_400_000L;
 
