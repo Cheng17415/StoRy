@@ -22,7 +22,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
         <p class="pd-muted">Cargando…</p>
       } @else if (producto(); as p) {
         <form [formGroup]="form" class="pd-form-root" (ngSubmit)="$event.preventDefault()">
-        <!-- Cabecera tipo Sortly: título + acciones -->
         <header class="pd-hero">
           <div class="pd-hero-text">
             <label class="pd-title-field">
