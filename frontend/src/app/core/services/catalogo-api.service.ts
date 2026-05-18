@@ -1,7 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CategoriaDto, MovimientoStockDto, ProductoDto } from '../models/catalogo.models';
+import {
+  CategoriaDto,
+  InventarioEstadisticasDto,
+  MovimientoStockDto,
+  ProductoDto,
+} from '../models/catalogo.models';
 
 export interface ProductoFormPayload {
   nombre: string;
@@ -32,6 +37,12 @@ export class CatalogoApiService {
 
   getProductoMovimientos(id: number): Observable<MovimientoStockDto[]> {
     return this.http.get<MovimientoStockDto[]>(`/api/productos/${id}/movimientos`);
+  }
+
+  getInventarioEstadisticas(desde: string, hasta: string): Observable<InventarioEstadisticasDto> {
+    return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
+      params: { desde, hasta },
+    });
   }
 
   createProducto(payload: ProductoFormPayload): Observable<ProductoDto> {

@@ -48,4 +48,10 @@ export class AppComponent {
     const n = u.name?.trim();
     return n || u.username || 'Usuario';
   }
+
+  /** Estadísticas de inventario: administrador de empresa o analytics_viewer (alineado con la API). */
+  protected puedeVerEstadisticas(): boolean {
+    const r = this.auth.currentUser()?.companyRole;
+    return r === 'company_admin' || r === 'analytics_viewer';
+  }
 }

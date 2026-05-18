@@ -26,6 +26,12 @@ class ProductoSecurityTest {
     }
 
     @Test
+    void estadisticasInventario_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/productos/estadisticas").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void accountMe_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/account/me").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());

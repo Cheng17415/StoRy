@@ -28,3 +28,25 @@ export interface ProductoDto {
   categoriaId: number | null;
   categoriaNombre: string | null;
 }
+
+export interface SerieDiaMovimientoDto {
+  fecha: string;
+  entradasUnidades: number;
+  salidasUnidades: number;
+  ajustesUnidades: number;
+}
+
+export interface ProductoSalidaResumenDto {
+  productoId: number;
+  nombreProducto: string;
+  unidadesSalida: number;
+}
+
+export interface InventarioEstadisticasDto {
+  totalMovimientos: number;
+  unidadesEntrada: number;
+  unidadesSalida: number;
+  unidadesAjuste: number;
+  seriePorDia: SerieDiaMovimientoDto[];
+  topSalidasProducto: ProductoSalidaResumenDto[];
+}

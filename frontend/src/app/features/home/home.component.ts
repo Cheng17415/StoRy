@@ -58,7 +58,28 @@ import { RouterLink } from '@angular/router';
             </p>
           </li>
         </ul>
-      </section>  
+      </section>
+
+      <section class="panel proposal" aria-labelledby="stats-vision-title">
+        <h2 id="stats-vision-title">Indicadores y visión operativa</h2>
+        <p>
+          Cada vez que cambias la cantidad en un producto, StoRy genera un movimiento de
+          <strong>entrada</strong> o <strong>salida</strong>. La pantalla <strong>Estadísticas</strong> (visible para
+          el administrador de la empresa o para usuarios con rol <strong>analytics_viewer</strong>) agrega esos datos
+          por rango de fechas: totales del periodo, serie diaria (por ejemplo, salidas de stock el día X) y un ranking de
+          artículos con más unidades retiradas. Las fechas del filtro están en <strong>UTC</strong>, alineadas con el
+          registro del servidor. La petición usa el mismo prefijo autenticado que el catálogo:
+          <code>/api/productos/estadisticas</code>.
+        </p>
+        <p class="panel-lead">Líneas posibles para seguir evolucionando el tablero:</p>
+        <ul class="proposal-list">
+          <li>Objetivos de rotación o salidas máximas por mes y avisos si se superan.</li>
+          <li>Exportación CSV o PDF para auditoría o entrega a proveedores.</li>
+          <li>Actividad por usuario (quién concentró más movimientos en un periodo).</li>
+          <li>Valor aproximado del inventario (cantidad × precio) y comparación entre dos periodos.</li>
+        </ul>
+        <a routerLink="/login" class="feature-link">Inicia sesión para abrir Estadísticas</a>
+      </section>
     </div>
   `,
   styles: `
@@ -243,6 +264,24 @@ import { RouterLink } from '@angular/router';
 
     .cta-panel .cta-text {
       margin-bottom: 1rem;
+    }
+
+    .proposal .panel-lead {
+      margin: 0 0 0.5rem;
+      font-weight: 600;
+      color: var(--story-text);
+      font-size: 0.95rem;
+    }
+
+    .proposal-list {
+      margin: 0 0 1rem;
+      padding-left: 1.25rem;
+      color: var(--story-text-muted);
+      line-height: 1.55;
+    }
+
+    .proposal-list li {
+      margin-bottom: 0.4rem;
     }
   `,
 })

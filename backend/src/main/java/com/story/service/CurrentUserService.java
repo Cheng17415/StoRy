@@ -67,4 +67,16 @@ public class CurrentUserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el administrador de empresa puede realizar esta acción");
         }
     }
+
+    /**
+     * Estadísticas agregadas de inventario: administrador de empresa o rol de lectura analítica.
+     */
+    public void requireCompanyAdminOrAnalyticsViewer() {
+        CompanyRole role = requireCurrentCompanyRole();
+        if (role != CompanyRole.company_admin && role != CompanyRole.analytics_viewer) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Solo company_admin o analytics_viewer pueden consultar estadísticas de inventario");
+        }
+    }
 }

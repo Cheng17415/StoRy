@@ -7,6 +7,9 @@
   <nav>
     @if (auth.loggedIn()) {
       <a routerLink="/productos" routerLinkActive="active">Productos</a>
+      @if (puedeVerEstadisticas()) {
+        <a routerLink="/estadisticas" routerLinkActive="active">Estadísticas</a>
+      }
       <a routerLink="/empresa" routerLinkActive="active">Empresa</a>
     }
   </nav>

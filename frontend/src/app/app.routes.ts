@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, landingGuard } from './core/guards/auth.guard';
+import { authGuard, estadisticasGuard, landingGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -27,6 +27,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/catalogo/productos.component').then((m) => m.ProductosComponent),
+  },
+  {
+    path: 'estadisticas',
+    canActivate: [estadisticasGuard],
+    loadComponent: () =>
+      import('./features/inventario/estadisticas.component').then((m) => m.EstadisticasComponent),
   },
   {
     path: 'producto/:id',

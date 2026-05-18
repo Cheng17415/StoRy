@@ -204,13 +204,6 @@ function readStoredLayout(): LayoutMode {
         </section>
 
         @if (data.items.length === 0) {
-          <p class="empty-hint">
-            @if (searchTerm().trim()) {
-              No hay resultados para esta búsqueda.
-            } @else {
-              No hay productos. Pulsa «Añadir producto» para crear el primero.
-            }
-          </p>
         } @else {
           @switch (layoutMode()) {
             @case ('grid') {
