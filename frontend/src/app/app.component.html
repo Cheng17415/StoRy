@@ -5,13 +5,12 @@
     <span class="brand-text">{{ title }}</span>
   </a>
   <nav>
-    @if (auth.loggedIn()) {
+    @if (auth.loggedIn() && auth.inCompany()) {
       <a routerLink="/productos" routerLinkActive="active">Productos</a>
       @if (puedeVerEstadisticas()) {
         <a routerLink="/estadisticas" routerLinkActive="active">Estadísticas</a>
       }
       <a routerLink="/stock-bajo" routerLinkActive="active">Stock bajo</a>
-      <a routerLink="/empresa" routerLinkActive="active">Empresa</a>
     }
   </nav>
   <div class="header-actions">
@@ -103,7 +102,7 @@
 <footer class="app-footer" role="contentinfo">
   <div class="app-footer-inner">
     <span class="app-footer-name">Chengzhe Li</span>
-    <span class="app-footer-sep" aria-hidden="true">·</span>
+    <span class="app-footer-sep" aria-hidden="true"> - </span>
     <a class="app-footer-contact" href="mailto:chengzhe17415@gmail.com">chengzhe17415@gmail.com</a>
   </div>
 </footer>

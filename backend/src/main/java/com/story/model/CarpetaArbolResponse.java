@@ -7,7 +7,6 @@ public record CarpetaArbolResponse(
         String nombre,
         Long parentId,
         String descripcion,
-        String imagen,
         List<CarpetaArbolResponse> hijos
 ) {
 }

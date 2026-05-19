@@ -113,6 +113,10 @@ public class CatalogoService {
     public List<ProductoResponse> listarProductosBajoMinimo(Long categoriaId) {
         Long companyId = currentUserService.requireCurrentCompanyId();
         return productoRepository.findBajoStockMinimo(companyId, categoriaId).stream()
+                .sorted(Comparator
+                        .comparingInt((Producto p) -> p.getStockMinimo() - p.getCantidad())
+                        .reversed()
+                        .thenComparing(p -> p.getNombre(), String.CASE_INSENSITIVE_ORDER))
                 .map(this::toResponse)
                 .toList();
     }
@@ -223,6 +227,21 @@ public class CatalogoService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
             p.setCarpeta(carpeta);
         }
+        p.setFechaActualizacion(Instant.now());
+        productoRepository.save(p);
+        return toResponse(p);
+    }
+
+    @Transactional
+    public ProductoResponse actualizarStockMinimo(Long productoId, Integer stockMinimo) {
+        currentUserService.requireCompanyAdmin();
+        if (stockMinimo != null && stockMinimo < 0) {
+            throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
+        }
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        Producto p = productoRepository.findByIdAndCompany_Id(productoId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        p.setStockMinimo(stockMinimo);
         p.setFechaActualizacion(Instant.now());
         productoRepository.save(p);
         return toResponse(p);

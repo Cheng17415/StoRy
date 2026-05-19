@@ -38,14 +38,10 @@ public class CarpetaController {
         return carpetaService.listarArbol();
     }
 
-    /**
-     * Creación con JSON (como PATCH de carpeta), para que la autenticación Bearer sea la misma que en el resto del API.
-     * Imagen opcional en Base64 (data URL o crudo).
-     */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public CarpetaResponse crear(@Valid @RequestBody CrearCarpetaJsonRequest body) {
-        return carpetaService.crear(body.nombre(), body.parentId(), body.descripcion(), body.imagenBase64());
+        return carpetaService.crear(body.nombre(), body.parentId(), body.descripcion());
     }
 
     @PatchMapping("/{id}")

@@ -1,7 +1,6 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, from } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 import {
   CarpetaArbolDto,
@@ -25,7 +24,6 @@ export interface CarpetaFormPayload {
   nombre: string;
   /** Notas de la carpeta (mapea a `descripcion` en API). */
   descripcion: string;
-  imagen: File | null;
   parentId?: number | null;
 }
 
@@ -99,7 +97,6 @@ export class CatalogoApiService {
       nombre: string;
       descripcion: string;
       parentId?: number;
-      imagenBase64?: string;
     } = {
       nombre: payload.nombre,
       descripcion: payload.descripcion ?? '',
@@ -107,23 +104,7 @@ export class CatalogoApiService {
     if (payload.parentId != null) {
       body.parentId = payload.parentId;
     }
-    if (!payload.imagen) {
-      return this.http.post<CarpetaDto>('/api/carpetas', body, this.authBearerOpts());
-    }
-    return from(this.fileToDataUrl(payload.imagen)).pipe(
-      switchMap((dataUrl) =>
-        this.http.post<CarpetaDto>('/api/carpetas', { ...body, imagenBase64: dataUrl }, this.authBearerOpts()),
-      ),
-    );
-  }
-
-  private fileToDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result as string);
-      r.onerror = () => reject(new Error('No se pudo leer la imagen'));
-      r.readAsDataURL(file);
-    });
+    return this.http.post<CarpetaDto>('/api/carpetas', body, this.authBearerOpts());
   }
 
   renombrarCarpeta(id: number, nombre: string): Observable<CarpetaDto> {
@@ -177,15 +158,34 @@ export class CatalogoApiService {
     return this.http.get<MovimientoStockDto[]>(`/api/productos/${id}/movimientos`, this.authBearerOpts());
   }
 
+  updateProductoStockMinimo(id: number, stockMinimo: number | null): Observable<ProductoDto> {
+    return this.http.patch<ProductoDto>(
+      `/api/productos/${id}/stock-minimo`,
+      { stockMinimo },
+      this.authBearerOpts(),
+    );
+  }
+
   getInventarioEstadisticas(
     desde: string,
     hasta: string,
-    categoriaId?: number | null,
+    categoriaIds: number[] = [],
+    carpetaIds: number[] = [],
+    categoriaRaiz = false,
+    carpetaRaiz = false,
   ): Observable<InventarioEstadisticasDto> {
-    let params = new HttpParams().set('desde', desde).set('hasta', hasta);
-    if (categoriaId != null && categoriaId > 0) {
-      params = params.set('categoriaId', String(categoriaId));
-    }
+    const cat = categoriaIds.filter((id) => id > 0).map(String);
+    const carp = carpetaIds.filter((id) => id > 0).map(String);
+    const params = new HttpParams({
+      fromObject: {
+        desde,
+        hasta,
+        ...(cat.length > 0 ? { categoriaIds: cat } : {}),
+        ...(carp.length > 0 ? { carpetaIds: carp } : {}),
+        ...(categoriaRaiz ? { categoriaRaiz: 'true' } : {}),
+        ...(carpetaRaiz ? { carpetaRaiz: 'true' } : {}),
+      },
+    });
     return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
       params,
       ...this.authBearerOpts(),

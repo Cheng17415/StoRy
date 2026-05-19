@@ -26,9 +26,9 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       <label class="rm-field">
         <span class="rm-label">Tipo</span>
         <select formControlName="tipo" class="rm-input">
-          <option value="ENTRADA">Entrada (compra, devolución…)</option>
-          <option value="SALIDA">Salida (venta, consumo…)</option>
-          <option value="AJUSTE">Ajuste (fijar stock total)</option>
+          <option value="ENTRADA">Entrada</option>
+          <option value="SALIDA">Salida</option>
+          <option value="AJUSTE">Ajuste</option>
         </select>
       </label>
       <label class="rm-field">
@@ -39,9 +39,12 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
         <span class="rm-label">Nota (opcional)</span>
         <input type="text" class="rm-input" formControlName="observacion" maxlength="500" />
       </label>
-      <button type="submit" class="rm-submit" [disabled]="form.invalid || submitting()">
-        {{ submitting() ? 'Guardando…' : 'Registrar' }}
-      </button>
+      <div class="rm-actions">
+        <button type="submit" class="rm-submit" [disabled]="form.invalid || submitting()">
+          {{ submitting() ? 'Guardando…' : 'Registrar' }}
+        </button>
+        <button type="button" class="rm-cancel" (click)="onCancel()">Cerrar</button>
+      </div>
     </form>
   `,
   styles: `
@@ -78,18 +81,27 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       font-size: 0.86rem;
       color: var(--story-danger, #b91c1c);
     }
-    .rm-submit {
+    .rm-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
       margin-top: 0.25rem;
-      width: fit-content;
+    }
+    .rm-submit,
+    .rm-cancel {
       padding: 0.45rem 1rem;
+      font: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .rm-submit {
       border: none;
-      border-radius: 6px;
       background: var(--story-primary, #1e40af);
       color: var(--story-on-primary, #fff);
-      font-weight: 600;
-      font-size: 0.88rem;
-      cursor: pointer;
-      transition: background 0.18s ease;
     }
     .rm-submit:hover:not(:disabled) {
       background: var(--story-primary-hover, #1d4ed8);
@@ -97,6 +109,14 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
     .rm-submit:disabled {
       opacity: 0.55;
       cursor: not-allowed;
+    }
+    .rm-cancel {
+      border: 1px solid var(--story-border, #e2e8f0);
+      background: var(--story-bg-page, #f8fafc);
+      color: var(--story-text, #1e293b);
+    }
+    .rm-cancel:hover {
+      background: var(--story-surface, #fff);
     }
   `,
 })
@@ -107,6 +127,7 @@ export class RegistrarMovimientoComponent implements OnChanges {
 
   @Input({ required: true }) producto!: ProductoDto;
   @Output() readonly completado = new EventEmitter<void>();
+  @Output() readonly cancelar = new EventEmitter<void>();
 
   protected readonly submitting = signal(false);
   protected readonly errorMsg = signal('');
@@ -153,6 +174,10 @@ export class RegistrarMovimientoComponent implements OnChanges {
   protected cantidadLabel(): string {
     const t = this.form.getRawValue().tipo;
     return t === 'AJUSTE' ? 'Nuevo stock total (uds.)' : 'Unidades';
+  }
+
+  protected onCancel(): void {
+    this.cancelar.emit();
   }
 
   protected onSubmit(): void {

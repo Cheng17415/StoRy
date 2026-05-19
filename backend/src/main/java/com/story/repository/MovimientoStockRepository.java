@@ -20,15 +20,10 @@ public interface MovimientoStockRepository extends JpaRepository<MovimientoStock
             where p.company.id = :companyId
             and m.fecha >= :desde
             and m.fecha < :hasta
-            and (
-              :categoriaId IS NULL
-              OR EXISTS (SELECT c FROM p.categorias c WHERE c.id = :categoriaId)
-            )
             order by m.fecha asc
             """)
     List<MovimientoStock> findByCompanyAndFechaRange(
             @Param("companyId") Long companyId,
             @Param("desde") Instant desde,
-            @Param("hasta") Instant hasta,
-            @Param("categoriaId") Long categoriaId);
+            @Param("hasta") Instant hasta);
 }

@@ -2,6 +2,7 @@ package com.story.repository;
 
 import com.story.model.CompanyMember;
 import com.story.model.CompanyMemberId;
+import com.story.model.CompanyRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Co
     List<CompanyMember> findByCompany_IdOrderByJoinedAtAsc(Long companyId);
 
     long countByCompany_Id(Long companyId);
+
+    long countByCompany_IdAndRole(Long companyId, CompanyRole role);
 
     boolean existsByCompany_IdAndUser_Id(Long companyId, Long userId);
 

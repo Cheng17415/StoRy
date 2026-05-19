@@ -193,29 +193,55 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         </aside>
         <div class="productos-main">
           <header class="page-head">
-        <h1 class="page-title">Todos los productos</h1>
+        <div class="page-head-text">
+          <h1 class="page-title">Productos</h1>
+        </div>
         <div class="page-head-actions">
           @if (canManageFolders()) {
-            <button type="button" class="btn-secondary-header" (click)="openCreateFolder()">Nueva carpeta</button>
+            <button type="button" class="btn-secondary-header" (click)="openCreateFolder()">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2zM12 11v6M9 14h6" />
+              </svg>
+              Nueva carpeta
+            </button>
           }
           @if (canCreateProduct()) {
-            <button type="button" class="btn-cta" (click)="openCreate()">Añadir producto</button>
+            <button type="button" class="btn-cta" (click)="openCreate()">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+              Añadir producto
+            </button>
           }
         </div>
       </header>
 
       <nav class="folder-bc" aria-label="Ubicación">
+        <span class="folder-bc-home" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-8 9 8M5 10v10h14V10" />
+          </svg>
+        </span>
         @for (crumb of breadcrumbs(); track idx; let idx = $index) {
           @if (idx > 0) {
-            <span class="folder-bc-sep" aria-hidden="true">/</span>
+            <span class="folder-bc-sep" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="12" height="12">
+                <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6" />
+              </svg>
+            </span>
           }
-          <button type="button" class="folder-bc-link" (click)="goBreadcrumb(idx)">{{ crumb.nombre }}</button>
+          <button type="button" class="folder-bc-link" [class.folder-bc-link--current]="idx === breadcrumbs().length - 1" (click)="goBreadcrumb(idx)">{{ crumb.nombre }}</button>
         }
       </nav>
 
       <section class="toolbar-strip">
         <div class="search-wrap">
-          <span class="search-icon" aria-hidden="true">⌕</span>
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </span>
           <input
             type="search"
             class="search-input"
@@ -225,94 +251,62 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           />
         </div>
         <label class="cat-filter">
-          <span class="cat-filter-label">Categoría</span>
+          <span class="cat-filter-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            </svg>
+          </span>
           <select
             class="cat-filter-select"
             [value]="categoriaFiltro() != null ? '' + categoriaFiltro() : ''"
             (change)="onCategoriaFiltroChange($event)"
+            aria-label="Filtrar por categoría"
           >
-            <option value="">Todas</option>
+            <option value="">Todas las categorías</option>
             @for (c of categorias(); track c.id) {
               <option [value]="'' + c.id">{{ c.nombre }}</option>
             }
           </select>
         </label>
         <div class="toolbar-right">
-          <div class="layout-dropdown" #layoutDropdown>
-            <button
-              type="button"
-              class="layout-trigger"
-              [attr.aria-expanded]="layoutMenuOpen()"
-              aria-haspopup="listbox"
-              [attr.aria-label]="'Tipo de vista: ' + layoutLabel()"
-              (click)="toggleLayoutMenu($event)"
-            >
-              @switch (layoutMode()) {
-                @case ('grid') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                  </svg>
+          <div class="layout-segmented" role="tablist" aria-label="Tipo de vista" #layoutDropdown>
+            @for (opt of layoutOptions; track opt.mode) {
+              <button
+                type="button"
+                class="layout-seg-btn"
+                role="tab"
+                [class.active]="layoutMode() === opt.mode"
+                [attr.aria-selected]="layoutMode() === opt.mode"
+                [attr.aria-label]="opt.label"
+                [title]="opt.label"
+                (click)="selectLayout(opt.mode)"
+              >
+                @switch (opt.mode) {
+                  @case ('grid') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+                      <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+                    </svg>
+                  }
+                  @case ('list') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="5" rx="1.5" fill="currentColor" />
+                      <rect x="3" y="14" width="18" height="5" rx="1.5" fill="currentColor" />
+                    </svg>
+                  }
+                  @case ('table') {
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                      <rect x="3" y="10.25" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                      <rect x="3" y="16.5" width="18" height="3.5" rx="0.8" fill="currentColor" />
+                    </svg>
+                  }
                 }
-                @case ('list') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="5" rx="1" fill="currentColor" />
-                    <rect x="3" y="14" width="18" height="5" rx="1" fill="currentColor" />
-                  </svg>
-                }
-                @case ('table') {
-                  <svg class="layout-trigger-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="3" y="4" width="18" height="4" rx="0.5" fill="currentColor" />
-                    <rect x="3" y="10" width="18" height="4" rx="0.5" fill="currentColor" />
-                    <rect x="3" y="16" width="18" height="4" rx="0.5" fill="currentColor" />
-                  </svg>
-                }
-              }
-            </button>
-            @if (layoutMenuOpen()) {
-              <div class="layout-panel" role="listbox">
-                <div class="layout-panel-title">Tipo de vista</div>
-                @for (opt of layoutOptions; track opt.mode) {
-                  <button
-                    type="button"
-                    class="layout-option"
-                    role="option"
-                    [class.active]="layoutMode() === opt.mode"
-                    [attr.aria-selected]="layoutMode() === opt.mode"
-                    (click)="selectLayout(opt.mode); $event.stopPropagation()"
-                  >
-                    @switch (opt.mode) {
-                      @case ('grid') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="14" y="3" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="3" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                          <rect x="14" y="14" width="7" height="7" rx="1" fill="currentColor" />
-                        </svg>
-                      }
-                      @case ('list') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="5" width="18" height="5" rx="1" fill="currentColor" />
-                          <rect x="3" y="14" width="18" height="5" rx="1" fill="currentColor" />
-                        </svg>
-                      }
-                      @case ('table') {
-                        <svg class="layout-option-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <rect x="3" y="4" width="18" height="4" rx="0.5" fill="currentColor" />
-                          <rect x="3" y="10" width="18" height="4" rx="0.5" fill="currentColor" />
-                          <rect x="3" y="16" width="18" height="4" rx="0.5" fill="currentColor" />
-                        </svg>
-                      }
-                    }
-                    <span class="layout-option-label">{{ opt.label }}</span>
-                  </button>
-                }
-              </div>
+              </button>
             }
           </div>
-          <span class="sort-toolbar-label">Ordenar</span>
           <div class="sort-dropdown" #sortDropdown>
             <button
               type="button"
@@ -321,8 +315,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               aria-haspopup="listbox"
               (click)="toggleSortMenu($event)"
             >
+              <svg class="sort-trigger-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 6h13M3 12h9M3 18h5M17 4v16M17 20l3-3M17 20l-3-3" />
+              </svg>
               <span class="sort-trigger-main">{{ sortTriggerText() }}</span>
-              <span class="sort-trigger-chev" aria-hidden="true">▾</span>
+              <svg class="sort-trigger-chev" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+              </svg>
             </button>
             @if (sortMenuOpen()) {
               <div class="sort-panel" role="listbox">
@@ -352,23 +351,54 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       @if (vm$ | async; as vm) {
         @switch (layoutMode()) {
           @case ('grid') {
-            @if (vm.subcarpetas.length > 0) {
-              <section class="folder-block card-grid" aria-label="Subcarpetas">
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
+              </div>
+            </section>
+            @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
+              <div class="card-grid">
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-card product-card--click folder-card" (click)="enterFolder(d, $event)">
                     <div class="card-image-wrap">
-                      @if (d.imagen) {
-                        <img [src]="d.imagen" [alt]="d.nombre" class="card-image" />
-                      } @else {
-                        <div class="card-placeholder card-placeholder--folder" aria-hidden="true">
+                      <div class="card-placeholder card-placeholder--folder" aria-hidden="true">
                           <svg class="folder-placeholder-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path
                               fill="currentColor"
                               d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                             />
                           </svg>
-                        </div>
-                      }
+                      </div>
                     </div>
                     <div class="card-body">
                       <div class="card-title-row">
@@ -396,7 +426,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                   Renombrar
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                                  Mover…
+                                  Mover
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                                   Clonar carpeta
@@ -422,24 +452,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     </div>
                   </article>
                 }
-              </section>
-            }
-            <section class="stats-bar" aria-label="Resumen">
-              <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
-              </div>
-            </section>
-            @if (vm.pageData.items.length > 0) {
-              <div class="card-grid">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-card product-card--click" (click)="goToProducto(p.id, $event)">
                     <div class="card-image-wrap">
@@ -480,7 +492,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                   Clonar
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
-                                  Mover a carpeta…
+                                  Mover a carpeta
                                 </button>
                               }
                               @if (canDeleteProduct()) {
@@ -518,27 +530,60 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             }
           }
           @case ('list') {
-            @if (vm.subcarpetas.length > 0) {
-              <section class="folder-block product-list" aria-label="Subcarpetas">
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
+              </div>
+            </section>
+            @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
+              <div class="product-list">
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-list-row folder-list-row" (click)="enterFolder(d, $event)">
                     <div class="list-thumb">
-                      @if (d.imagen) {
-                        <img [src]="d.imagen" [alt]="''" class="list-thumb-img" />
-                      } @else {
-                        <div class="list-thumb-placeholder list-thumb-placeholder--folder" aria-hidden="true">
+                      <div class="list-thumb-placeholder list-thumb-placeholder--folder" aria-hidden="true">
                           <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
                             <path
                               fill="currentColor"
                               d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                             />
                           </svg>
-                        </div>
-                      }
+                      </div>
                     </div>
                     <div class="list-main">
                       <h2 class="list-title">{{ d.nombre }}</h2>
-                      <p class="list-meta"><span class="folder-meta-label">Carpeta</span></p>
+                      <p class="list-meta">
+                        <span class="folder-meta-label">Carpeta</span>
+                      </p>
                     </div>
                     <div class="list-stats">
                       <span class="list-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
@@ -567,7 +612,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                               Renombrar
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                              Mover…
+                              Mover
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                               Clonar carpeta
@@ -583,24 +628,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     }
                   </article>
                 }
-              </section>
-            }
-            <section class="stats-bar" aria-label="Resumen">
-              <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
-              </div>
-              <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
-              </div>
-            </section>
-            @if (vm.pageData.items.length > 0) {
-              <div class="product-list">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-list-row" (click)="goToProducto(p.id, $event)">
                     <div class="list-thumb">
@@ -615,7 +642,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                       <p class="list-meta">
                         <span class="card-code">{{ p.codigo }}</span>
                         @if (p.categorias.length) {
-                          <span class="list-cat"> · {{ formatProductoCategorias(p) }}</span>
+                          <span class="list-cat"> - {{ formatProductoCategorias(p) }}</span>
                         }
                       </p>
                     </div>
@@ -655,7 +682,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                               Clonar
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
-                              Mover a carpeta…
+                              Mover a carpeta
                             </button>
                           }
                           @if (canDeleteProduct()) {
@@ -679,16 +706,37 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           @case ('table') {
             <section class="stats-bar" aria-label="Resumen">
               <div class="stat">
-                <span class="stat-label">Productos</span>
-                <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Cantidad total</span>
-                <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
               </div>
               <div class="stat">
-                <span class="stat-label">Valor total</span>
-                <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
               </div>
             </section>
             @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
@@ -709,18 +757,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     @for (d of vm.subcarpetas; track d.id) {
                       <tr class="product-table-row folder-table-row" (click)="enterFolder(d, $event)">
                         <td class="td-thumb">
-                          @if (d.imagen) {
-                            <img [src]="d.imagen" [alt]="''" class="table-thumb-img" />
-                          } @else {
-                            <div class="table-thumb-ph table-thumb-ph--folder" aria-hidden="true">
+                          <div class="table-thumb-ph table-thumb-ph--folder" aria-hidden="true">
                               <svg class="folder-placeholder-icon folder-placeholder-icon--sm" viewBox="0 0 24 24" aria-hidden="true">
                                 <path
                                   fill="currentColor"
                                   d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
                                 />
                               </svg>
-                            </div>
-                          }
+                          </div>
                         </td>
                         <td class="td-name">{{ d.nombre }}</td>
                         <td class="td-code">—</td>
@@ -751,7 +795,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                     Renombrar
                                   </button>
                                   <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                                    Mover…
+                                    Mover
                                   </button>
                                   <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                                     Clonar carpeta
@@ -836,7 +880,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                     class="card-dd-item"
                                     (click)="openMoveProductDialog(p)"
                                   >
-                                    Mover a carpeta…
+                                    Mover a carpeta
                                   </button>
                                 }
                                 @if (canDeleteProduct()) {
@@ -918,19 +962,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         <h3>{{ dialogTitle() }}</h3>
         <form [formGroup]="form" (ngSubmit)="save()">
           <label>
-            Nombre
+            <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="text" formControlName="nombre" />
           </label>
           <label>
-            Cantidad
+            <span class="field-label">Cantidad <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="number" formControlName="cantidad" min="0" step="1" />
           </label>
           <label>
-            Precio
+            <span class="field-label">Precio <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="number" formControlName="precio" min="0" step="0.01" />
           </label>
           <label>
-            Stock mínimo (opcional)
+            <span class="field-label">Stock mínimo</span>
             <input
               type="number"
               formControlName="stockMinimo"
@@ -938,14 +982,20 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               step="1"
               placeholder="Sin umbral"
             />
-            <span class="field-hint">Si la cantidad es menor, el nombre se muestra en rojo.</span>
           </label>
           <label>
-            Notas (opcional)
+            Notas
             <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre el producto"></textarea>
           </label>
-          <label class="photo-field">
-            <span class="photo-field-label">Foto</span>
+          <div class="photo-field">
+            <span class="photo-field-label">Imagen</span>
+            @if (previewUrl() || dialogImageUrl()) {
+              <img
+                [src]="previewUrl() || dialogImageUrl()!"
+                alt=""
+                class="photo-preview"
+              />
+            }
             <div class="photo-upload">
               <div class="photo-upload-inner">
                 <svg
@@ -967,18 +1017,20 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               <input
                 type="file"
                 class="photo-upload-input"
-                aria-label="Subir foto del producto"
+                aria-label="Subir imagen del producto"
                 accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
                 (change)="onFile($event)"
               />
             </div>
-          </label>
+          </div>
           @if (formError()) {
             <p class="error">{{ formError() }}</p>
           }
           <div class="modal-actions">
             <button type="button" class="btn-secondary" (click)="closeDialog()">Cancelar</button>
-            <button type="submit" class="btn-submit" [disabled]="form.invalid || saving()">Guardar</button>
+            <button type="submit" class="btn-submit" [disabled]="form.invalid || saving()">
+              {{ saving() ? 'Guardando…' : 'Guardar' }}
+            </button>
           </div>
         </form>
       </div>
@@ -989,48 +1041,21 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         <h3>Nueva carpeta</h3>
         <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
           <label>
-            Nombre
+            <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="text" formControlName="nombre" />
           </label>
           <label>
-            Notas (opcional)
-            <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre la carpeta"></textarea>
-          </label>
-          <label class="photo-field">
-            <span class="photo-field-label">Foto</span>
-            <div class="photo-upload">
-              <div class="photo-upload-inner">
-                <svg
-                  class="photo-upload-icon"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
-                  />
-                </svg>
-                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
-              </div>
-              <input
-                type="file"
-                class="photo-upload-input"
-                aria-label="Subir foto de la carpeta"
-                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
-                (change)="onFolderFile($event)"
-              />
-            </div>
+            <span class="field-label">Notas</span>
+            <textarea formControlName="descripcion" rows="3" placeholder="Descripción de la carpeta"></textarea>
           </label>
           @if (folderFormError()) {
             <p class="error">{{ folderFormError() }}</p>
           }
           <div class="modal-actions">
             <button type="button" class="btn-secondary" (click)="closeFolderDialog()">Cancelar</button>
-            <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">Guardar</button>
+            <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">
+              {{ folderSaving() ? 'Guardando…' : 'Guardar' }}
+            </button>
           </div>
         </form>
       </div>
@@ -1092,14 +1117,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
   `,
   styles: `
     :host {
-      --inv-cta: #b91c1c;
-      --inv-cta-hover: #991b1b;
+      --inv-cta: var(--story-primary);
+      --inv-cta-hover: var(--story-primary-hover);
+      --inv-danger: var(--story-danger);
       --inv-surface: #ffffff;
-      --inv-border: #e8e8e8;
-      --inv-muted: #6b7280;
-      --inv-page: #f3f4f6;
-      --inv-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-      --inv-shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.1);
+      --inv-border: #e2e8f0;
+      --inv-border-strong: #cbd5e1;
+      --inv-muted: #64748b;
+      --inv-text: #0f172a;
+      --inv-text-soft: #334155;
+      --inv-page: #f8fafc;
+      --inv-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --inv-shadow-hover: 0 10px 25px rgba(15, 23, 42, 0.08);
+      --inv-focus-ring: 0 0 0 3px var(--story-focus-ring);
       display: block;
     }
 
@@ -1125,16 +1155,16 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       overflow-y: auto;
       overflow-x: hidden;
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 14px;
       background: var(--inv-surface);
       box-shadow: var(--inv-shadow);
     }
 
     .productos-tree-title {
-      padding: 0.65rem 0.75rem;
+      padding: 0.85rem 1rem 0.65rem;
       font-size: 0.7rem;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--inv-muted);
       border-bottom: 1px solid var(--inv-border);
@@ -1150,32 +1180,33 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .tree-row {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       width: 100%;
       text-align: left;
       border: none;
       background: transparent;
       cursor: pointer;
       font: inherit;
-      font-size: 0.875rem;
-      color: #374151;
-      padding: 0.45rem 0.65rem;
-      border-radius: 6px;
+      font-size: 0.88rem;
+      color: var(--inv-text-soft);
+      padding: 0.5rem 0.7rem;
+      border-radius: 8px;
       margin: 0 0.35rem;
       box-sizing: border-box;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .tree-row:hover {
-      background: #f3f4f6;
+      background: #f1f5f9;
     }
 
     .tree-row:focus-visible {
-      outline: 2px solid var(--inv-cta);
-      outline-offset: 2px;
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .tree-row--active {
-      background: #fef2f2;
+      background: rgba(30, 64, 175, 0.08);
       color: var(--inv-cta);
       font-weight: 600;
     }
@@ -1233,19 +1264,32 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .page-head {
       display: flex;
-      align-items: flex-start;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 1rem;
       flex-wrap: wrap;
-      margin-bottom: 1.25rem;
+      margin: 0.25rem 0 1.25rem;
+    }
+
+    .page-head-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
     }
 
     .page-title {
       margin: 0;
-      font-size: clamp(1.5rem, 3vw, 1.85rem);
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
       font-weight: 700;
-      letter-spacing: -0.02em;
-      color: #111827;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--inv-text);
+    }
+
+    .page-sub {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--inv-muted);
     }
 
     .page-head-actions {
@@ -1259,48 +1303,91 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.55rem 1rem;
-      border-radius: 4px;
-      border: 1px solid var(--inv-border);
+      gap: 0.4rem;
+      height: 2.5rem;
+      padding: 0 0.95rem;
+      border-radius: 10px;
+      border: 1px solid var(--inv-border-strong);
       background: var(--inv-surface);
-      font-size: 0.8rem;
+      font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
+      transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-secondary-header svg {
+      color: var(--inv-muted);
+      transition: color 0.18s ease;
     }
 
     .btn-secondary-header:hover {
-      border-color: #d1d5db;
-      background: #f9fafb;
+      border-color: var(--inv-cta);
+      color: var(--inv-cta);
+      background: #ffffff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+
+    .btn-secondary-header:hover svg {
+      color: var(--inv-cta);
+    }
+
+    .btn-secondary-header:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .folder-bc {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.35rem;
-      margin: 0 0 1rem;
-      font-size: 0.9rem;
+      gap: 0.4rem;
+      margin: 0 0 1.1rem;
+      padding: 0.55rem 0.85rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      box-shadow: var(--inv-shadow);
+    }
+
+    .folder-bc-home {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--inv-muted);
+      margin-right: 0.1rem;
     }
 
     .folder-bc-link {
       border: none;
       background: none;
-      padding: 0;
+      padding: 0.2rem 0.45rem;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
       font: inherit;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .folder-bc-link:hover {
       color: var(--inv-cta);
+      background: rgba(30, 64, 175, 0.06);
+    }
+
+    .folder-bc-link--current {
+      color: var(--inv-text);
+      font-weight: 700;
+      cursor: default;
     }
 
     .folder-bc-sep {
-      color: var(--inv-muted);
+      display: inline-flex;
+      align-items: center;
+      color: #cbd5e1;
       user-select: none;
     }
 
@@ -1349,6 +1436,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-weight: 700;
     }
 
+    .folder-list-row {
+      background: #f8fafc;
+    }
+
+    .folder-card {
+      background: #f8fafc;
+    }
+
     .modal--move-picker {
       max-width: 22rem;
       width: calc(100vw - 2rem);
@@ -1390,39 +1485,55 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 0.55rem 1.1rem;
-      border: none;
-      border-radius: 4px;
+      gap: 0.45rem;
+      height: 2.35rem;
+      padding: 0 0.95rem;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
       background: var(--inv-cta);
-      color: #fff;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+      color: #ffffff;
+      font-size: 0.86rem;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
       cursor: pointer;
-      transition: background 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: var(--inv-shadow);
+      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.05s ease;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
+    }
+
+    .btn-cta:active {
+      transform: translateY(1px);
     }
 
     .btn-cta:hover {
       background: var(--inv-cta-hover);
-      box-shadow: var(--inv-shadow-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
+    }
+
+    .btn-cta:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring), 0 4px 12px rgba(30, 64, 175, 0.25);
     }
 
     .toolbar-strip {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1rem;
+      gap: 0.75rem 1rem;
+      margin-bottom: 1.25rem;
+      padding: 0.75rem 0.85rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 14px;
+      box-shadow: var(--inv-shadow);
     }
 
     .search-wrap {
       position: relative;
-      flex: 1;
-      min-width: 200px;
-      max-width: 28rem;
+      flex: 1 1 18rem;
+      min-width: 14rem;
+      max-width: 26rem;
     }
 
     .search-icon {
@@ -1430,63 +1541,100 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       left: 0.85rem;
       top: 50%;
       transform: translateY(-50%);
-      color: var(--inv-muted);
-      font-size: 1rem;
+      display: inline-flex;
+      color: #94a3b8;
       pointer-events: none;
+      transition: color 0.18s ease;
+    }
+
+    .search-wrap:focus-within .search-icon {
+      color: var(--inv-cta);
     }
 
     .search-input {
       width: 100%;
-      padding: 0.65rem 0.85rem 0.65rem 2.25rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 999px;
+      height: 2.5rem;
+      padding: 0 0.95rem 0 2.5rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       background: var(--inv-surface);
-      font-size: 0.95rem;
+      font-size: 0.92rem;
+      color: var(--inv-text);
       outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .search-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .search-input:hover {
+      border-color: #94a3b8;
     }
 
     .search-input:focus {
-      border-color: #c4c4c4;
-      box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .cat-filter {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      min-width: 10rem;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-width: 12rem;
     }
 
-    .cat-filter-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+    .cat-filter-icon {
+      position: absolute;
+      left: 0.7rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
       color: var(--inv-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      pointer-events: none;
+      transition: color 0.18s ease;
+    }
+
+    .cat-filter:focus-within .cat-filter-icon {
+      color: var(--inv-cta);
     }
 
     .cat-filter-select {
-      padding: 0.55rem 0.75rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 8px;
+      width: 100%;
+      height: 2.5rem;
+      padding: 0 2.25rem 0 2.35rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       background: var(--inv-surface);
       font: inherit;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--inv-text);
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.65rem center;
+      background-size: 14px;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .cat-filter-select:hover {
+      border-color: #94a3b8;
+    }
+
+    .cat-filter-select:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .toolbar-right {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.6rem;
+      margin-left: auto;
       position: relative;
-    }
-
-    .sort-toolbar-label {
-      font-size: 0.85rem;
-      color: var(--inv-muted);
-      font-weight: 500;
     }
 
     .sort-dropdown {
@@ -1496,43 +1644,66 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .sort-trigger {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.45rem 0.65rem 0.45rem 0.85rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 6px;
+      gap: 0.5rem;
+      height: 2.5rem;
+      padding: 0 0.65rem 0 0.85rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       background: var(--inv-surface);
-      font-size: 0.875rem;
+      font-size: 0.88rem;
       cursor: pointer;
-      color: #374151;
-      min-width: 12rem;
-      justify-content: space-between;
+      color: var(--inv-text-soft);
+      min-width: 12.5rem;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
     }
 
     .sort-trigger:hover {
-      border-color: #d1d5db;
+      border-color: var(--inv-cta);
+      color: var(--inv-text);
+    }
+
+    .sort-trigger:hover .sort-trigger-icon,
+    .sort-trigger[aria-expanded='true'] .sort-trigger-icon {
+      color: var(--inv-cta);
+    }
+
+    .sort-trigger:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
+    }
+
+    .sort-trigger-icon {
+      color: var(--inv-muted);
+      flex-shrink: 0;
+      transition: color 0.18s ease;
     }
 
     .sort-trigger-main {
+      flex: 1;
       font-weight: 500;
       text-align: left;
     }
 
     .sort-trigger-chev {
       color: var(--inv-muted);
-      font-size: 0.65rem;
-      line-height: 1;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .sort-trigger[aria-expanded='true'] .sort-trigger-chev {
+      transform: rotate(180deg);
     }
 
     .sort-panel {
       position: absolute;
       right: 0;
-      top: calc(100% + 4px);
+      top: calc(100% + 6px);
       min-width: 14rem;
-      padding: 0.35rem 0;
+      padding: 0.4rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
       z-index: 20;
     }
 
@@ -1542,17 +1713,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       justify-content: space-between;
       width: 100%;
       gap: 0.75rem;
-      padding: 0.55rem 1rem;
+      padding: 0.55rem 0.75rem;
       border: none;
+      border-radius: 8px;
       background: transparent;
       font-size: 0.9rem;
       cursor: pointer;
-      color: var(--inv-muted);
+      color: var(--inv-text-soft);
       text-align: left;
+      transition: background 0.12s ease;
     }
 
     .sort-option:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .sort-option.active {
@@ -1571,124 +1744,116 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       color: var(--inv-cta);
     }
 
-    .layout-dropdown {
-      position: relative;
+    .layout-segmented {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      height: 2.5rem;
+      background: #f1f5f9;
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
     }
 
-    .layout-trigger {
+    .layout-seg-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 2.1rem;
+      height: 100%;
       padding: 0;
-      border: 1px solid #4b5563;
-      border-radius: 8px;
-      background: #374151;
-      color: #fff;
-      cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .layout-trigger:hover {
-      background: #4b5563;
-      border-color: #6b7280;
-    }
-
-    .layout-trigger-icon {
-      width: 1.25rem;
-      height: 1.25rem;
-      display: block;
-    }
-
-    .layout-panel {
-      position: absolute;
-      right: 0;
-      top: calc(100% + 6px);
-      min-width: 12.5rem;
-      padding: 0.5rem 0 0.35rem;
-      background: var(--inv-surface);
-      border: 1px solid var(--inv-border);
-      border-radius: 10px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-      z-index: 25;
-    }
-
-    .layout-panel-title {
-      padding: 0 0.85rem 0.4rem;
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #9ca3af;
-    }
-
-    .layout-option {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      width: 100%;
-      padding: 0.55rem 0.85rem;
       border: none;
+      border-radius: 7px;
       background: transparent;
-      font-size: 0.9rem;
+      color: var(--inv-muted);
       cursor: pointer;
-      color: #6b7280;
-      text-align: left;
+      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
     }
 
-    .layout-option:hover {
-      background: #f9fafb;
+    .layout-seg-btn:hover {
+      color: var(--inv-text);
     }
 
-    .layout-option.active {
-      background: #f3f4f6;
-      color: #111827;
-      font-weight: 600;
-    }
-
-    .layout-option-icon {
-      flex-shrink: 0;
-      width: 1.15rem;
-      height: 1.15rem;
-      color: #9ca3af;
-    }
-
-    .layout-option.active .layout-option-icon {
+    .layout-seg-btn.active {
+      background: var(--inv-surface);
       color: var(--inv-cta);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06);
     }
 
-    .layout-option-label {
-      flex: 1;
+    .layout-seg-btn:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .stats-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.5rem 2.5rem;
-      padding: 0.85rem 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+      gap: 0.75rem;
       margin-bottom: 1.25rem;
-      border-bottom: 1px solid var(--inv-border);
     }
 
     .stat {
       display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.85rem 1rem;
+      background: var(--inv-surface);
+      border: 1px solid var(--inv-border);
+      border-radius: 12px;
+      box-shadow: var(--inv-shadow);
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .stat:hover {
+      border-color: var(--inv-border-strong);
+      transform: translateY(-1px);
+    }
+
+    .stat-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon--blue {
+      background: rgba(30, 64, 175, 0.10);
+      color: var(--inv-cta);
+    }
+
+    .stat-icon--amber {
+      background: rgba(245, 158, 11, 0.14);
+      color: #d97706;
+    }
+
+    .stat-icon--green {
+      background: rgba(21, 128, 61, 0.10);
+      color: var(--story-success);
+    }
+
+    .stat-body {
+      display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      gap: 0.1rem;
+      min-width: 0;
     }
 
     .stat-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+      font-size: 0.7rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.06em;
       color: var(--inv-muted);
     }
 
     .stat-value {
-      font-size: 1.05rem;
+      font-size: 1.2rem;
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
+      letter-spacing: -0.015em;
     }
 
     .loading,
@@ -1712,11 +1877,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .product-card {
       background: var(--inv-surface);
-      border-radius: 10px;
+      border-radius: 14px;
       overflow: visible;
       border: 1px solid var(--inv-border);
       box-shadow: var(--inv-shadow);
-      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
     }
 
     /** Encima de la tarjeta/fila siguiente cuando el menú ⋮ está abierto (evita que tape el dropdown) */
@@ -1734,13 +1899,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .product-card--click:hover {
       box-shadow: var(--inv-shadow-hover);
       transform: translateY(-2px);
+      border-color: var(--inv-border-strong);
     }
 
     .card-image-wrap {
       position: relative;
       aspect-ratio: 4 / 3;
       background: #eceef1;
-      border-radius: 10px 10px 0 0;
+      border-radius: 14px 14px 0 0;
       overflow: hidden;
     }
 
@@ -1831,11 +1997,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       top: calc(100% + 4px);
       right: 0;
       min-width: 11rem;
-      padding: 0.35rem 0;
+      padding: 0.35rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 0 1px rgba(15, 23, 42, 0.08);
       z-index: 30;
     }
 
@@ -1853,21 +2019,27 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .card-dd-item {
       display: block;
       width: 100%;
-      padding: 0.5rem 0.85rem;
+      padding: 0.55rem 0.75rem;
       border: none;
       background: transparent;
+      border-radius: 8px;
       font-size: 0.88rem;
       text-align: left;
       cursor: pointer;
-      color: #374151;
+      color: var(--inv-text-soft);
+      transition: background 0.12s ease;
     }
 
     .card-dd-item:hover {
-      background: #f9fafb;
+      background: #f1f5f9;
     }
 
     .card-dd-item.danger {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
+    }
+
+    .card-dd-item.danger:hover {
+      background: rgba(185, 28, 28, 0.08);
     }
 
     .card-sep {
@@ -1986,7 +2158,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.95rem;
       font-weight: 700;
       line-height: 1.3;
-      color: #111827;
+      color: var(--inv-text);
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -1994,7 +2166,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .card-title.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .card-meta {
@@ -2022,7 +2194,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .card-price {
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .product-list {
@@ -2036,12 +2208,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       flex-wrap: wrap;
       align-items: center;
       gap: 0.85rem 1rem;
-      padding: 0.75rem 0.85rem;
+      padding: 0.85rem 1rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: var(--inv-shadow);
       cursor: pointer;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .product-list-row:hover {
+      border-color: var(--inv-border-strong);
+      box-shadow: var(--inv-shadow-hover);
+      transform: translateY(-1px);
     }
 
     .list-thumb {
@@ -2081,11 +2260,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.95rem;
       font-weight: 700;
       line-height: 1.3;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .list-title.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .list-meta {
@@ -2113,7 +2292,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .list-price {
       font-weight: 700;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .list-actions {
@@ -2156,13 +2335,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.875rem;
       background: var(--inv-surface);
       border: 1px solid var(--inv-border);
-      border-radius: 10px;
+      border-radius: 14px;
       overflow: visible;
       box-shadow: var(--inv-shadow);
     }
 
     .product-table thead {
-      background: #f9fafb;
+      background: #f8fafc;
       border-bottom: 1px solid var(--inv-border);
     }
 
@@ -2187,14 +2366,15 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .product-table tbody tr:hover {
-      background: #fafafa;
+      background: #f8fafc;
     }
 
     .col-thumb {
       width: 3.25rem;
     }
 
-    .col-num {
+    .product-table th.col-num,
+    .product-table td.col-num {
       text-align: right;
       white-space: nowrap;
     }
@@ -2234,12 +2414,12 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .td-name {
       font-weight: 600;
-      color: #111827;
+      color: var(--inv-text);
       max-width: 14rem;
     }
 
     .td-name.stock-bajo {
-      color: var(--inv-cta);
+      color: var(--inv-danger);
     }
 
     .td-code {
@@ -2250,13 +2430,17 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     .td-price {
       font-weight: 600;
-      color: #111827;
+      color: var(--inv-text);
     }
 
     .td-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
+    }
+
+    tr.product-table-row {
+      transition: background 0.15s ease;
     }
 
     .table-action-btn {
@@ -2276,19 +2460,21 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .row-stock-bajo {
-      background: #fff5f5;
+      background: rgba(185, 28, 28, 0.04);
     }
 
     .modal {
       border: none;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 0;
       max-width: 26rem;
       width: calc(100vw - 2rem);
+      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
     }
 
     .modal::backdrop {
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(2px);
     }
 
     .modal-inner {
@@ -2316,18 +2502,40 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       color: #374151;
     }
 
+    .field-label {
+      display: block;
+      line-height: 1.3;
+    }
+
+    .required-mark {
+      color: var(--inv-cta, #b91c1c);
+      font-weight: 700;
+    }
+
     input[type='text'],
     input[type='number'],
     textarea {
-      padding: 0.5rem 0.6rem;
-      border: 1px solid var(--inv-border);
-      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
       font: inherit;
       resize: vertical;
       min-height: 4rem;
+      background: #ffffff;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    input[type='text']:focus,
+    input[type='number']:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
     }
 
     .photo-field {
+      display: flex;
+      flex-direction: column;
       gap: 0.4rem;
     }
 
@@ -2335,6 +2543,15 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.875rem;
       font-weight: 500;
       color: #374151;
+    }
+
+    .photo-preview {
+      width: 100%;
+      max-height: 10rem;
+      object-fit: contain;
+      border: 1px solid var(--inv-border);
+      border-radius: 8px;
+      background: #fafafa;
     }
 
     .photo-upload {
@@ -2409,33 +2626,61 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .btn-secondary {
-      padding: 0.5rem 0.95rem;
-      border-radius: 6px;
-      border: 1px solid var(--inv-border);
-      background: #fff;
+      padding: 0.6rem 1.05rem;
+      border-radius: 10px;
+      border: 1px solid var(--inv-border-strong);
+      background: #ffffff;
       cursor: pointer;
-      font-weight: 500;
+      font-weight: 600;
+      color: var(--inv-text-soft);
+      transition: border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
     }
 
     .btn-submit {
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 6px;
+      padding: 0.6rem 1.1rem;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
       background: var(--inv-cta);
       color: #fff;
       font-weight: 600;
       cursor: pointer;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.22);
+      transition: background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--inv-cta-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
+    }
+
+    .btn-submit:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
     }
 
     .btn-submit:disabled {
       opacity: 0.55;
       cursor: not-allowed;
+      box-shadow: none;
     }
 
     .error {
-      color: #b00020;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--inv-danger);
       font-size: 0.85rem;
       margin: 0;
+      padding: 0.55rem 0.7rem;
+      background: rgba(185, 28, 28, 0.07);
+      border: 1px solid rgba(185, 28, 28, 0.2);
+      border-radius: 8px;
     }
   `,
 })
@@ -2523,6 +2768,9 @@ export class ProductosComponent implements OnInit {
         tap(({ arbol }) => this.latestArbol.set(arbol)),
         map(({ page, allCompany, arbol }) => {
           const qq = q.trim().toLowerCase();
+          const productSource = qq
+            ? this.productosEnAlcanceBusqueda(allCompany, fid, arbol, catId)
+            : page;
           let subcarpetas = this.buildSubcarpetasVm(
             carpetasEnNivel(arbol, fid),
             arbol,
@@ -2533,7 +2781,7 @@ export class ProductosComponent implements OnInit {
           }
           subcarpetas = this.sortSubcarpetas(subcarpetas, sort);
           return {
-            pageData: this.buildPageData(page, q, sort),
+            pageData: this.buildPageData(productSource, q, sort),
             subcarpetas,
           };
         }),
@@ -2552,12 +2800,13 @@ export class ProductosComponent implements OnInit {
   protected readonly dialogTitle = signal('Nuevo producto');
   protected readonly formError = signal('');
   protected readonly saving = signal(false);
+  protected readonly previewUrl = signal<string | null>(null);
+  protected readonly dialogImageUrl = signal<string | null>(null);
 
   private file: File | null = null;
 
   protected readonly folderFormError = signal('');
   protected readonly folderSaving = signal(false);
-  private folderFile: File | null = null;
 
   protected readonly folderForm = this.fb.group({
     nombre: this.fb.nonNullable.control('', Validators.required),
@@ -2673,18 +2922,12 @@ export class ProductosComponent implements OnInit {
       return;
     }
     this.folderForm.reset({ nombre: '', descripcion: '' });
-    this.folderFile = null;
     this.folderFormError.set('');
     queueMicrotask(() => this.folderDialogRef()?.nativeElement.showModal());
   }
 
   protected closeFolderDialog(): void {
     this.folderDialogRef()?.nativeElement.close();
-  }
-
-  protected onFolderFile(ev: Event): void {
-    const input = ev.target as HTMLInputElement;
-    this.folderFile = input.files?.[0] ?? null;
   }
 
   protected saveFolder(): void {
@@ -2703,7 +2946,6 @@ export class ProductosComponent implements OnInit {
       .crearCarpeta({
         nombre,
         descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
-        imagen: this.folderFile,
         ...(parentId != null ? { parentId } : {}),
       })
       .subscribe({
@@ -3065,6 +3307,32 @@ export class ProductosComponent implements OnInit {
     }
   }
 
+  /** Productos buscables según carpeta actual: toda la empresa en raíz, o subárbol (sin padres). */
+  private productosEnAlcanceBusqueda(
+    allProducts: ProductoDto[],
+    carpetaId: number | null,
+    arbol: CarpetaArbolDto[],
+    categoriaId: number | null,
+  ): ProductoDto[] {
+    let scoped =
+      carpetaId === null
+        ? allProducts
+        : allProducts.filter((p) => {
+            if (p.carpetaId == null) {
+              return false;
+            }
+            return collectCarpetaSubtreeIds(arbol, carpetaId).has(p.carpetaId);
+          });
+
+    if (categoriaId != null && categoriaId > 0) {
+      scoped = scoped.filter(
+        (p) => p.categorias?.some((c) => c.id === categoriaId) ?? false,
+      );
+    }
+
+    return scoped;
+  }
+
   private buildPageData(list: ProductoDto[], q: string, sort: SortState): ProductosPageData {
     const totalQty = list.reduce((s, p) => s + (p.cantidad ?? 0), 0);
     const totalValue = list.reduce((s, p) => {
@@ -3185,7 +3453,7 @@ export class ProductosComponent implements OnInit {
     this.editingId.set(null);
     this.dialogTitle.set('Nuevo producto');
     this.form.reset({ nombre: '', cantidad: 0, precio: 0, stockMinimo: null, descripcion: '' });
-    this.file = null;
+    this.clearFileSelection();
     this.formError.set('');
     this.dialogRef()?.nativeElement.showModal();
   }
@@ -3200,19 +3468,34 @@ export class ProductosComponent implements OnInit {
       stockMinimo: p.stockMinimo ?? null,
       descripcion: p.descripcion ?? '',
     });
-    this.file = null;
+    this.clearFileSelection();
+    this.dialogImageUrl.set(p.imagen ?? null);
     this.formError.set('');
     this.dialogRef()?.nativeElement.showModal();
   }
 
   protected closeDialog(): void {
+    this.clearFileSelection();
     this.dialogRef()?.nativeElement.close();
   }
 
   protected onFile(ev: Event): void {
     const input = ev.target as HTMLInputElement;
-    const f = input.files?.[0];
-    this.file = f ?? null;
+    const f = input.files?.[0] ?? null;
+    this.file = f;
+    if (this.previewUrl()) {
+      URL.revokeObjectURL(this.previewUrl()!);
+    }
+    this.previewUrl.set(f ? URL.createObjectURL(f) : null);
+  }
+
+  private clearFileSelection(): void {
+    this.file = null;
+    if (this.previewUrl()) {
+      URL.revokeObjectURL(this.previewUrl()!);
+      this.previewUrl.set(null);
+    }
+    this.dialogImageUrl.set(null);
   }
 
   protected save(): void {

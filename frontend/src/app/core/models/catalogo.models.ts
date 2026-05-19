@@ -46,7 +46,6 @@ export interface CarpetaArbolDto {
   nombre: string;
   parentId: number | null;
   descripcion?: string | null;
-  imagen?: string | null;
   hijos: CarpetaArbolDto[];
 }
 
@@ -61,7 +60,6 @@ export interface CarpetaDto {
   nombre: string;
   parentId: number | null;
   descripcion?: string | null;
-  imagen?: string | null;
 }
 
 export interface SerieDiaMovimientoDto {
@@ -82,6 +80,13 @@ export interface InventarioEstadisticasDto {
   unidadesEntrada: number;
   unidadesSalida: number;
   unidadesAjuste: number;
+  valorEntrada: number;
+  valorSalida: number;
+  valorAjuste: number;
+  totalProductos: number;
+  productosBajoMinimo: number;
+  cantidadActualTotal: number;
+  valorInventarioTotal: number;
   seriePorDia: SerieDiaMovimientoDto[];
   topSalidasProducto: ProductoSalidaResumenDto[];
 }

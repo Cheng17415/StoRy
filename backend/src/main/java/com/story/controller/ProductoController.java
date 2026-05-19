@@ -1,6 +1,7 @@
 package com.story.controller;
 
 import com.story.model.AgregarProductoCategoriaRequest;
+import com.story.model.ActualizarStockMinimoRequest;
 import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.MoverProductoCarpetaRequest;
@@ -76,13 +77,29 @@ public class ProductoController {
     public InventarioEstadisticasResponse estadisticasInventario(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
-            @RequestParam(required = false) Long categoriaId) {
+            @RequestParam(name = "categoriaIds", required = false) List<Long> categoriaIds,
+            @RequestParam(name = "carpetaIds", required = false) List<Long> carpetaIds,
+            @RequestParam(name = "categoriaRaiz", defaultValue = "false") boolean categoriaRaiz,
+            @RequestParam(name = "carpetaRaiz", defaultValue = "false") boolean carpetaRaiz,
+            @RequestParam(name = "categoriaId", required = false) Long categoriaIdLegacy) {
         if (desde.isAfter(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
         }
         Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return inventarioService.estadisticas(desdeInstant, hastaInstant, categoriaId);
+        List<Long> mergedCategorias = mergeFilterIds(categoriaIds, categoriaIdLegacy);
+        return inventarioService.estadisticas(
+                desdeInstant, hastaInstant, mergedCategorias, carpetaIds, categoriaRaiz, carpetaRaiz);
+    }
+
+    private static List<Long> mergeFilterIds(List<Long> ids, Long legacyId) {
+        if (ids != null && !ids.isEmpty()) {
+            return ids;
+        }
+        if (legacyId != null && legacyId > 0) {
+            return List.of(legacyId);
+        }
+        return List.of();
     }
 
     @GetMapping("/{id:\\d+}")
@@ -144,6 +161,14 @@ public class ProductoController {
     @PatchMapping("/{id}/carpeta")
     public ProductoResponse moverCarpeta(@PathVariable Long id, @RequestBody MoverProductoCarpetaRequest body) {
         return catalogoService.moverProductoCarpeta(id, body.carpetaId());
+    }
+
+    @PatchMapping("/{id}/stock-minimo")
+    public ProductoResponse actualizarStockMinimo(
+            @PathVariable Long id,
+            @RequestBody ActualizarStockMinimoRequest body
+    ) {
+        return catalogoService.actualizarStockMinimo(id, body.stockMinimo());
     }
 
     @PostMapping("/{id}/categorias")

@@ -11,7 +11,6 @@ import com.story.repository.ProductoRepository;
 import com.story.service.CarpetaService;
 import com.story.service.CatalogoService;
 import com.story.service.CurrentUserService;
-import com.story.service.FileStorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -44,9 +43,6 @@ class CarpetaServiceTest {
     private CatalogoService catalogoService;
     @Mock
     private CurrentUserService currentUserService;
-    @Mock
-    private FileStorageService fileStorageService;
-
     @InjectMocks
     private CarpetaService carpetaService;
 
@@ -75,7 +71,6 @@ class CarpetaServiceTest {
     void eliminar_eliminaProductosAntesDeCarpeta() {
         Company company = company(1L);
         ProductoCarpeta folder = carpeta(5L, company, null);
-        folder.setImagen("/uploads/carpeta/x.webp");
         Producto p = producto(99L, company);
         p.setCarpeta(folder);
 
@@ -84,13 +79,11 @@ class CarpetaServiceTest {
         when(productoCarpetaRepository.findByIdAndCompany_Id(5L, 1L)).thenReturn(Optional.of(folder));
         when(productoCarpetaRepository.findAllByCompany_IdAndParent_IdOrderByNombreAsc(1L, 5L))
                 .thenReturn(List.of());
-        when(productoCarpetaRepository.findAllById(ArgumentMatchers.any())).thenReturn(List.of(folder));
         when(productoRepository.findAllByCompany_IdAndCarpeta_IdIn(eq(1L), ArgumentMatchers.<Set<Long>>any()))
                 .thenReturn(List.of(p));
 
         carpetaService.eliminar(5L);
 
-        verify(fileStorageService).deleteIfStored("/uploads/carpeta/x.webp");
         verify(catalogoService).eliminarProductoSinChequeoAdmin(p);
         verify(productoCarpetaRepository).delete(folder);
     }

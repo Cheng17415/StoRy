@@ -72,7 +72,7 @@ class CatalogoServiceClonarProductoTest {
         origen.setCantidad(4);
         origen.setPrecio(new BigDecimal("2.50"));
         origen.setCodigo("OLD-CODE");
-        origen.setImagen("/api/files/old.png");
+        origen.setImagen("https://example.supabase.co/storage/v1/object/public/imagenes/old.png");
         origen.setActivo(true);
         origen.setFechaCreacion(Instant.now());
         origen.setFechaActualizacion(Instant.now());
@@ -82,7 +82,8 @@ class CatalogoServiceClonarProductoTest {
         doNothing().when(currentUserService).requireRoleAtLeastEmployee();
         when(currentUserService.requireCurrentUsuario()).thenReturn(u);
         when(currentUserService.requireCurrentCompanyMember()).thenReturn(memberWithCompany(company));
-        when(fileStorageService.copyIfStored("/api/files/old.png")).thenReturn("/api/files/new.png");
+        when(fileStorageService.copyIfStored("https://example.supabase.co/storage/v1/object/public/imagenes/old.png"))
+                .thenReturn("https://example.supabase.co/storage/v1/object/public/imagenes/new.png");
         when(productoRepository.existsByCompany_IdAndCodigo(eq(3L), any())).thenReturn(false);
 
         catalogoService.clonarProducto(100L);
@@ -91,7 +92,7 @@ class CatalogoServiceClonarProductoTest {
         Producto saved = productCaptor.getValue();
         assertEquals("Lápiz (copia)", saved.getNombre());
         assertEquals(4, saved.getCantidad());
-        assertEquals("/api/files/new.png", saved.getImagen());
+        assertEquals("https://example.supabase.co/storage/v1/object/public/imagenes/new.png", saved.getImagen());
         assertTrue(saved.getCodigo().startsWith("PRD-"));
         verify(inventarioService).registrarStockInicial(saved, 4);
     }

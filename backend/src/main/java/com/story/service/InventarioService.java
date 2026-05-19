@@ -9,20 +9,24 @@ import com.story.model.SerieDiaMovimiento;
 import com.story.model.TipoMovimiento;
 import com.story.repository.CategoriaRepository;
 import com.story.repository.MovimientoStockRepository;
+import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 @Service
@@ -31,17 +35,20 @@ public class InventarioService {
     private final MovimientoStockRepository movimientoStockRepository;
     private final ProductoRepository productoRepository;
     private final CategoriaRepository categoriaRepository;
+    private final ProductoCarpetaRepository productoCarpetaRepository;
     private final CurrentUserService currentUserService;
 
     public InventarioService(
             MovimientoStockRepository movimientoStockRepository,
             ProductoRepository productoRepository,
             CategoriaRepository categoriaRepository,
+            ProductoCarpetaRepository productoCarpetaRepository,
             CurrentUserService currentUserService
     ) {
         this.movimientoStockRepository = movimientoStockRepository;
         this.productoRepository = productoRepository;
         this.categoriaRepository = categoriaRepository;
+        this.productoCarpetaRepository = productoCarpetaRepository;
         this.currentUserService = currentUserService;
     }
 
@@ -65,7 +72,14 @@ public class InventarioService {
      * Agrega movimientos de la empresa en {@code [desde, hasta)} (instantes UTC) para cuadros de mando y series por día.
      */
     @Transactional(readOnly = true)
-    public InventarioEstadisticasResponse estadisticas(Instant desde, Instant hasta, Long categoriaId) {
+    public InventarioEstadisticasResponse estadisticas(
+            Instant desde,
+            Instant hasta,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
         currentUserService.requireCompanyAdminOrAnalyticsViewer();
         if (!desde.isBefore(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El instante 'desde' debe ser anterior a 'hasta'");
@@ -75,20 +89,55 @@ public class InventarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 366 días");
         }
         Long companyId = currentUserService.requireCurrentCompanyId();
-        if (categoriaId != null) {
+        List<Long> catFilter = normalizeIdList(categoriaIds);
+        List<Long> carpFilter = normalizeIdList(carpetaIds);
+        for (Long categoriaId : catFilter) {
             categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
         }
-        List<MovimientoStock> rows =
-                movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta, categoriaId);
+        for (Long carpetaId : carpFilter) {
+            productoCarpetaRepository.findByIdAndCompany_Id(carpetaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        }
+        List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
+                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter, categoriaRaiz, carpetaRaiz))
+                .toList();
+        Set<Long> productoIds = new HashSet<>();
+        for (Producto p : productos) {
+            productoIds.add(p.getId());
+        }
+        List<MovimientoStock> rows = movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
+        boolean filtraProducto = !catFilter.isEmpty() || categoriaRaiz || !carpFilter.isEmpty() || carpetaRaiz;
+        if (filtraProducto) {
+            rows = rows.stream()
+                    .filter(m -> productoIds.contains(m.getProducto().getId()))
+                    .toList();
+        }
 
         long unidadesEntrada = 0;
         long unidadesSalida = 0;
         long unidadesAjuste = 0;
+        BigDecimal valorEntrada = BigDecimal.ZERO;
+        BigDecimal valorSalida = BigDecimal.ZERO;
+        BigDecimal valorAjuste = BigDecimal.ZERO;
+        long cantidadActualTotal = 0;
+        long productosBajoMinimo = 0;
+        BigDecimal valorInventarioTotal = BigDecimal.ZERO;
         ZoneOffset utc = ZoneOffset.UTC;
         TreeMap<LocalDate, EnumMap<TipoMovimiento, Long>> porDia = new TreeMap<>();
         Map<Long, Long> salidasPorProducto = new HashMap<>();
         Map<Long, String> nombreProducto = new HashMap<>();
+
+        for (Producto p : productos) {
+            int cantidad = p.getCantidad() != null ? p.getCantidad() : 0;
+            cantidadActualTotal += cantidad;
+            if (Boolean.TRUE.equals(p.getActivo()) && p.getStockMinimo() != null && cantidad <= p.getStockMinimo()) {
+                productosBajoMinimo++;
+            }
+            if (p.getPrecio() != null) {
+                valorInventarioTotal = valorInventarioTotal.add(p.getPrecio().multiply(BigDecimal.valueOf(cantidad)));
+            }
+        }
 
         for (MovimientoStock m : rows) {
             LocalDate dia = m.getFecha().atZone(utc).toLocalDate();
@@ -97,9 +146,18 @@ public class InventarioService {
             int c = m.getCantidad();
             bucket.merge(m.getTipo(), (long) c, Long::sum);
             switch (m.getTipo()) {
-                case ENTRADA -> unidadesEntrada += c;
-                case SALIDA -> unidadesSalida += c;
-                case AJUSTE -> unidadesAjuste += c;
+                case ENTRADA -> {
+                    unidadesEntrada += c;
+                    valorEntrada = valorEntrada.add(valorMovimiento(m, c));
+                }
+                case SALIDA -> {
+                    unidadesSalida += c;
+                    valorSalida = valorSalida.add(valorMovimiento(m, c));
+                }
+                case AJUSTE -> {
+                    unidadesAjuste += c;
+                    valorAjuste = valorAjuste.add(valorMovimiento(m, c));
+                }
             }
             if (m.getTipo() == TipoMovimiento.SALIDA) {
                 Producto p = m.getProducto();
@@ -130,6 +188,13 @@ public class InventarioService {
                 unidadesEntrada,
                 unidadesSalida,
                 unidadesAjuste,
+                valorEntrada,
+                valorSalida,
+                valorAjuste,
+                productos.size(),
+                productosBajoMinimo,
+                cantidadActualTotal,
+                valorInventarioTotal,
                 serie,
                 topSalidas);
     }
@@ -226,6 +291,55 @@ public class InventarioService {
         movimientoStockRepository.save(m);
 
         return toResponse(m);
+    }
+
+    private static BigDecimal valorMovimiento(MovimientoStock m, int unidades) {
+        if (unidades <= 0) {
+            return BigDecimal.ZERO;
+        }
+        Producto p = m.getProducto();
+        if (p.getPrecio() == null) {
+            return BigDecimal.ZERO;
+        }
+        return p.getPrecio().multiply(BigDecimal.valueOf(unidades));
+    }
+
+    private static List<Long> normalizeIdList(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream().filter(id -> id != null && id > 0).distinct().toList();
+    }
+
+    private static boolean matchesEstadisticasFilters(
+            Producto p,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
+        if (categoriaRaiz || !categoriaIds.isEmpty()) {
+            boolean sinCategorias = p.getCategorias() == null || p.getCategorias().isEmpty();
+            boolean enCategoriaSeleccionada =
+                    !categoriaIds.isEmpty()
+                            && p.getCategorias().stream().anyMatch(c -> categoriaIds.contains(c.getId()));
+            boolean matchCategoria = (categoriaRaiz && sinCategorias) || enCategoriaSeleccionada;
+            if (!matchCategoria) {
+                return false;
+            }
+        }
+        if (carpetaRaiz || !carpetaIds.isEmpty()) {
+            boolean sinCarpeta = p.getCarpeta() == null;
+            boolean enCarpetaSeleccionada =
+                    !carpetaIds.isEmpty()
+                            && p.getCarpeta() != null
+                            && carpetaIds.contains(p.getCarpeta().getId());
+            boolean matchCarpeta = (carpetaRaiz && sinCarpeta) || enCarpetaSeleccionada;
+            if (!matchCarpeta) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String normalizeObservacion(String raw) {

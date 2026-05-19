@@ -47,3 +47,7 @@ export interface InviteMemberPayload {
   email: string;
   role: CompanyRole;
 }
+
+export interface UpdateMemberRolePayload {
+  role: CompanyRole;
+}

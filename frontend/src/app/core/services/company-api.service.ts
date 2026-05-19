@@ -7,6 +7,8 @@ import {
   CreateCompanyPayload,
   InviteMemberPayload,
   JoinCompanyPayload,
+  UpdateMemberRolePayload,
+  CompanyMemberDto,
 } from '../models/company.models';
 
 @Injectable({ providedIn: 'root' })
@@ -35,5 +37,9 @@ export class CompanyApiService {
 
   acceptInvitation(token: string): Observable<CompanySummaryDto> {
     return this.http.post<CompanySummaryDto>('/api/company/invitations/accept', { token });
+  }
+
+  updateMemberRole(userId: number, payload: UpdateMemberRolePayload): Observable<CompanyMemberDto> {
+    return this.http.patch<CompanyMemberDto>(`/api/company/members/${userId}/role`, payload);
   }
 }

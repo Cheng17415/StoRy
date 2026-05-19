@@ -18,6 +18,30 @@ export class AuthService {
     return t != null && t.length > 0;
   });
   readonly currentUser = computed(() => this.user());
+  readonly inCompany = computed(() => this.currentUser()?.companyId != null);
+
+  defaultHomeRoute(): string {
+    return this.inCompany() ? '/productos' : '/empresa';
+  }
+
+  resolvePostAuthUrl(returnUrl: string | null | undefined): string {
+    const fallback = this.defaultHomeRoute();
+    if (!returnUrl?.startsWith('/')) {
+      return fallback;
+    }
+    if (this.routeRequiresCompany(returnUrl) && !this.inCompany()) {
+      return '/empresa';
+    }
+    return returnUrl;
+  }
+
+  routeRequiresCompany(url: string): boolean {
+    if (url.startsWith('/producto/')) {
+      return true;
+    }
+    const paths = ['/productos', '/estadisticas', '/stock-bajo', '/categorias'];
+    return paths.some((p) => url === p || url.startsWith(`${p}/`));
+  }
 
   getToken(): string | null {
     const norm = (raw: string | null): string | null => {

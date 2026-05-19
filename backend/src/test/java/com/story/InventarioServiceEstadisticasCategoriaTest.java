@@ -9,6 +9,7 @@ import com.story.model.TipoMovimiento;
 import com.story.model.Usuario;
 import com.story.repository.CategoriaRepository;
 import com.story.repository.MovimientoStockRepository;
+import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
 import com.story.service.CurrentUserService;
 import com.story.service.InventarioService;
@@ -43,6 +44,8 @@ class InventarioServiceEstadisticasCategoriaTest {
     @Mock
     private CategoriaRepository categoriaRepository;
     @Mock
+    private ProductoCarpetaRepository productoCarpetaRepository;
+    @Mock
     private CurrentUserService currentUserService;
 
     @InjectMocks
@@ -70,14 +73,68 @@ class InventarioServiceEstadisticasCategoriaTest {
         MovimientoStock movimiento = buildMovimiento(TipoMovimiento.SALIDA, 3);
 
         when(categoriaRepository.findByIdAndCompany_Id(5L, 1L)).thenReturn(Optional.of(categoria));
-        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta, 5L))
+        Producto producto = movimiento.getProducto();
+        Categoria enProducto = new Categoria();
+        enProducto.setId(5L);
+        producto.getCategorias().add(enProducto);
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of(producto));
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
                 .thenReturn(List.of(movimiento));
 
-        var result = inventarioService.estadisticas(desde, hasta, 5L);
+        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null, false, false);
 
         assertEquals(1, result.totalMovimientos());
         assertEquals(3, result.unidadesSalida());
-        verify(movimientoStockRepository).findByCompanyAndFechaRange(eq(1L), eq(desde), eq(hasta), eq(5L));
+        verify(movimientoStockRepository).findByCompanyAndFechaRange(eq(1L), eq(desde), eq(hasta));
+    }
+
+    @Test
+    void estadisticas_withCategoriaId_excludesNonMatchingProducts() {
+        Categoria categoria = new Categoria();
+        categoria.setId(5L);
+        when(categoriaRepository.findByIdAndCompany_Id(5L, 1L)).thenReturn(Optional.of(categoria));
+
+        MovimientoStock movimiento = buildMovimiento(TipoMovimiento.SALIDA, 4);
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of());
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
+                .thenReturn(List.of(movimiento));
+
+        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null, false, false);
+
+        assertEquals(0, result.totalMovimientos());
+        assertEquals(0, result.unidadesSalida());
+    }
+
+    @Test
+    void estadisticas_carpetaRaiz_includesProductsWithoutFolder() {
+        MovimientoStock movimiento = buildMovimiento(TipoMovimiento.ENTRADA, 2);
+        Producto producto = movimiento.getProducto();
+        producto.setCarpeta(null);
+
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of(producto));
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
+                .thenReturn(List.of(movimiento));
+
+        var result = inventarioService.estadisticas(desde, hasta, List.of(), List.of(), false, true);
+
+        assertEquals(1, result.totalMovimientos());
+        assertEquals(2, result.unidadesEntrada());
+    }
+
+    @Test
+    void estadisticas_categoriaRaiz_includesProductsWithoutCategory() {
+        MovimientoStock movimiento = buildMovimiento(TipoMovimiento.SALIDA, 1);
+        Producto producto = movimiento.getProducto();
+        producto.getCategorias().clear();
+
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of(producto));
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
+                .thenReturn(List.of(movimiento));
+
+        var result = inventarioService.estadisticas(desde, hasta, List.of(), List.of(), true, false);
+
+        assertEquals(1, result.totalMovimientos());
+        assertEquals(1, result.unidadesSalida());
     }
 
     @Test
@@ -86,7 +143,7 @@ class InventarioServiceEstadisticasCategoriaTest {
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> inventarioService.estadisticas(desde, hasta, 99L)
+                () -> inventarioService.estadisticas(desde, hasta, List.of(99L), null, false, false)
         );
 
         assertEquals(404, ex.getStatusCode().value());

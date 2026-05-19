@@ -55,6 +55,16 @@ En Linux o macOS:
 
 Para producción, define `SPRING_PROFILES_ACTIVE=prod` y las propiedades `spring.datasource.*` sin commitear secretos.
 
+### Imágenes (Supabase Storage)
+
+Las fotos de productos y carpetas se suben al bucket público **`imagenes`** en Supabase Storage. En `.env` añade además de `SUPABASE_URL` la clave **`SUPABASE_SERVICE_ROLE_KEY`** (Dashboard → Project Settings → API → `service_role`, solo backend).
+
+La API guarda en base de datos la URL pública, por ejemplo:
+
+`https://<project_ref>.supabase.co/storage/v1/object/public/imagenes/<uuid>.png`
+
+Las rutas antiguas `/api/files/...` siguen sirviéndose desde disco local si aún existen ficheros en `~/.story/uploads`.
+
 ### Endpoints de ejemplo
 
 - `GET http://localhost:8080/api/categorias`

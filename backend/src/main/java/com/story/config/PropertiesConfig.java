@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
         JwtProperties.class,
         GoogleOAuthProperties.class,
         UploadProperties.class,
+        SupabaseProperties.class,
         ResendProperties.class
 })
 public class PropertiesConfig {

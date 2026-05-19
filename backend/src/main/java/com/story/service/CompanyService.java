@@ -15,6 +15,7 @@ import com.story.model.company.CompanySummaryDto;
 import com.story.model.company.CreateCompanyRequest;
 import com.story.model.company.InviteCompanyMemberRequest;
 import com.story.model.company.JoinCompanyRequest;
+import com.story.model.company.UpdateCompanyMemberRoleRequest;
 import com.story.repository.CompanyInvitationRepository;
 import com.story.repository.CompanyMemberRepository;
 import com.story.repository.CompanyRepository;
@@ -149,6 +150,37 @@ public class CompanyService {
     public CompanySummaryDto getCurrentCompanySummary() {
         CompanyMember member = currentUserService.requireCurrentCompanyMember();
         return toSummary(member);
+    }
+
+    @Transactional
+    public CompanyMemberDto updateMemberRole(Long targetUserId, UpdateCompanyMemberRoleRequest request) {
+        CompanyMember currentMember = currentUserService.requireCurrentCompanyMember();
+        if (currentMember.getRole() != CompanyRole.company_admin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo company_admin puede cambiar roles");
+        }
+
+        Long companyId = currentMember.getCompany().getId();
+        CompanyMember targetMember = companyMemberRepository.findById(new CompanyMemberId(companyId, targetUserId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Miembro no encontrado"));
+
+        CompanyRole newRole = request.role();
+        if (targetMember.getRole() == newRole) {
+            return toMemberDto(targetMember);
+        }
+
+        if (targetMember.getRole() == CompanyRole.company_admin && newRole != CompanyRole.company_admin) {
+            long adminCount = companyMemberRepository.countByCompany_IdAndRole(companyId, CompanyRole.company_admin);
+            if (adminCount <= 1) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "La empresa debe tener al menos un propietario"
+                );
+            }
+        }
+
+        targetMember.setRole(newRole);
+        companyMemberRepository.save(targetMember);
+        return toMemberDto(targetMember);
     }
 
     @Transactional
