@@ -352,8 +352,43 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       @if (vm$ | async; as vm) {
         @switch (layoutMode()) {
           @case ('grid') {
-            @if (vm.subcarpetas.length > 0) {
-              <section class="folder-block card-grid" aria-label="Subcarpetas">
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
+              </div>
+            </section>
+            @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
+              <div class="card-grid">
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-card product-card--click folder-card" (click)="enterFolder(d, $event)">
                     <div class="card-image-wrap">
@@ -408,7 +443,8 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                         }
                       </div>
                       <p class="card-meta">
-                        <span class="folder-meta-label">Carpeta</span>
+                        <span class="card-code">—</span>
+                        <span class="list-cat"> · <span class="folder-meta-label">Carpeta</span></span>
                       </p>
                       <div class="card-footer">
                         <span class="card-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
@@ -418,45 +454,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     </div>
                   </article>
                 }
-              </section>
-            }
-            <section class="stats-bar" aria-label="Resumen">
-              <div class="stat">
-                <span class="stat-icon stat-icon--blue" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Productos</span>
-                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
-                </div>
-              </div>
-              <div class="stat">
-                <span class="stat-icon stat-icon--amber" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Cantidad total</span>
-                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
-                </div>
-              </div>
-              <div class="stat">
-                <span class="stat-icon stat-icon--green" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Valor total</span>
-                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
-                </div>
-              </div>
-            </section>
-            @if (vm.pageData.items.length > 0) {
-              <div class="card-grid">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-card product-card--click" (click)="goToProducto(p.id, $event)">
                     <div class="card-image-wrap">
@@ -535,8 +532,43 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             }
           }
           @case ('list') {
-            @if (vm.subcarpetas.length > 0) {
-              <section class="folder-block product-list" aria-label="Subcarpetas">
+            <section class="stats-bar" aria-label="Resumen">
+              <div class="stat">
+                <span class="stat-icon stat-icon--blue" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Productos</span>
+                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--amber" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Cantidad total</span>
+                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
+                </div>
+              </div>
+              <div class="stat">
+                <span class="stat-icon stat-icon--green" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div class="stat-body">
+                  <span class="stat-label">Valor total</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                </div>
+              </div>
+            </section>
+            @if (vm.subcarpetas.length > 0 || vm.pageData.items.length > 0) {
+              <div class="product-list">
                 @for (d of vm.subcarpetas; track d.id) {
                   <article class="product-list-row folder-list-row" (click)="enterFolder(d, $event)">
                     <div class="list-thumb">
@@ -551,7 +583,10 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     </div>
                     <div class="list-main">
                       <h2 class="list-title">{{ d.nombre }}</h2>
-                      <p class="list-meta"><span class="folder-meta-label">Carpeta</span></p>
+                      <p class="list-meta">
+                        <span class="card-code">—</span>
+                        <span class="list-cat"> · <span class="folder-meta-label">Carpeta</span></span>
+                      </p>
                     </div>
                     <div class="list-stats">
                       <span class="list-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
@@ -596,45 +631,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     }
                   </article>
                 }
-              </section>
-            }
-            <section class="stats-bar" aria-label="Resumen">
-              <div class="stat">
-                <span class="stat-icon stat-icon--blue" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Productos</span>
-                  <span class="stat-value">{{ vm.pageData.itemCount }}</span>
-                </div>
-              </div>
-              <div class="stat">
-                <span class="stat-icon stat-icon--amber" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Cantidad total</span>
-                  <span class="stat-value">{{ vm.pageData.totalQty }} uds.</span>
-                </div>
-              </div>
-              <div class="stat">
-                <span class="stat-icon stat-icon--green" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </span>
-                <div class="stat-body">
-                  <span class="stat-label">Valor total</span>
-                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
-                </div>
-              </div>
-            </section>
-            @if (vm.pageData.items.length > 0) {
-              <div class="product-list">
                 @for (p of vm.pageData.items; track p.id) {
                   <article class="product-list-row" (click)="goToProducto(p.id, $event)">
                     <div class="list-thumb">
@@ -1406,6 +1402,14 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 
     tr.folder-table-row .td-name {
       font-weight: 700;
+    }
+
+    .folder-list-row {
+      background: #f8fafc;
+    }
+
+    .folder-card {
+      background: #f8fafc;
     }
 
     .modal--move-picker {
@@ -2337,7 +2341,8 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       width: 3.25rem;
     }
 
-    .col-num {
+    .product-table th.col-num,
+    .product-table td.col-num {
       text-align: right;
       white-space: nowrap;
     }
