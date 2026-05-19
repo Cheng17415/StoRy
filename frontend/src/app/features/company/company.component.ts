@@ -33,9 +33,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       @if (companyPage(); as page) {
         <section class="company-hero" aria-labelledby="company-title">
           <div class="company-hero-main">
-            <div class="company-avatar" aria-hidden="true">
-              {{ page.company.name.slice(0, 1).toUpperCase() }}
-            </div>
             <div class="company-copy">
               <p class="eyebrow">Espacio de trabajo</p>
               <h1 id="company-title">{{ page.company.name }}</h1>
@@ -43,7 +40,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
                 <span class="role-pill" [class.role-pill--admin]="page.company.role === 'company_admin'">
                   {{ page.company.role === 'company_admin' ? 'Propietario' : page.company.role }}
                 </span>
-                <span class="role-note">Gestiona miembros, invitaciones y acceso a tu empresa.</span>
               </div>
             </div>
           </div>
@@ -310,29 +306,16 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
     }
 
     .company-hero {
-      position: relative;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 1.25rem;
       padding: 1.6rem;
-      overflow: hidden;
-      background:
-        radial-gradient(700px 260px at 0% 0%, rgba(59, 130, 246, 0.14), transparent 60%),
-        radial-gradient(560px 240px at 100% 120%, rgba(245, 158, 11, 0.14), transparent 65%),
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      background: #ffffff;
       border: 1px solid var(--story-border);
       border-radius: 20px;
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 10px 28px rgba(15, 23, 42, 0.05);
-    }
-
-    .company-hero::before {
-      content: '';
-      position: absolute;
-      inset: 0 0 auto;
-      height: 3px;
-      background: linear-gradient(90deg, var(--story-primary) 0%, var(--story-secondary) 60%, var(--story-accent) 100%);
     }
 
     .company-hero-main {
@@ -340,23 +323,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       align-items: center;
       gap: 1rem;
       min-width: min(100%, 22rem);
-      position: relative;
-      z-index: 1;
-    }
-
-    .company-avatar {
-      width: 4.25rem;
-      height: 4.25rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 18px;
-      background: linear-gradient(180deg, var(--story-secondary), var(--story-primary));
-      color: #ffffff;
-      font-size: 1.7rem;
-      font-weight: 800;
-      box-shadow: 0 10px 24px rgba(30, 64, 175, 0.25);
-      flex: 0 0 auto;
     }
 
     .company-copy {
@@ -818,12 +784,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
 
       .company-hero-main {
         align-items: flex-start;
-      }
-
-      .company-avatar {
-        width: 3.5rem;
-        height: 3.5rem;
-        border-radius: 15px;
       }
 
       .actions-row {

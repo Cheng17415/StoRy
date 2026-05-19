@@ -169,12 +169,19 @@ export class CatalogoApiService {
   getInventarioEstadisticas(
     desde: string,
     hasta: string,
-    categoriaId?: number | null,
+    categoriaIds: number[] = [],
+    carpetaIds: number[] = [],
   ): Observable<InventarioEstadisticasDto> {
-    let params = new HttpParams().set('desde', desde).set('hasta', hasta);
-    if (categoriaId != null && categoriaId > 0) {
-      params = params.set('categoriaId', String(categoriaId));
-    }
+    const cat = categoriaIds.filter((id) => id > 0).map(String);
+    const carp = carpetaIds.filter((id) => id > 0).map(String);
+    const params = new HttpParams({
+      fromObject: {
+        desde,
+        hasta,
+        ...(cat.length > 0 ? { categoriaIds: cat } : {}),
+        ...(carp.length > 0 ? { carpetaIds: carp } : {}),
+      },
+    });
     return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
       params,
       ...this.authBearerOpts(),

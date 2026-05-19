@@ -9,6 +9,7 @@ import com.story.model.SerieDiaMovimiento;
 import com.story.model.TipoMovimiento;
 import com.story.repository.CategoriaRepository;
 import com.story.repository.MovimientoStockRepository;
+import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,10 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 @Service
@@ -32,17 +35,20 @@ public class InventarioService {
     private final MovimientoStockRepository movimientoStockRepository;
     private final ProductoRepository productoRepository;
     private final CategoriaRepository categoriaRepository;
+    private final ProductoCarpetaRepository productoCarpetaRepository;
     private final CurrentUserService currentUserService;
 
     public InventarioService(
             MovimientoStockRepository movimientoStockRepository,
             ProductoRepository productoRepository,
             CategoriaRepository categoriaRepository,
+            ProductoCarpetaRepository productoCarpetaRepository,
             CurrentUserService currentUserService
     ) {
         this.movimientoStockRepository = movimientoStockRepository;
         this.productoRepository = productoRepository;
         this.categoriaRepository = categoriaRepository;
+        this.productoCarpetaRepository = productoCarpetaRepository;
         this.currentUserService = currentUserService;
     }
 
@@ -66,7 +72,12 @@ public class InventarioService {
      * Agrega movimientos de la empresa en {@code [desde, hasta)} (instantes UTC) para cuadros de mando y series por día.
      */
     @Transactional(readOnly = true)
-    public InventarioEstadisticasResponse estadisticas(Instant desde, Instant hasta, Long categoriaId) {
+    public InventarioEstadisticasResponse estadisticas(
+            Instant desde,
+            Instant hasta,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds
+    ) {
         currentUserService.requireCompanyAdminOrAnalyticsViewer();
         if (!desde.isBefore(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El instante 'desde' debe ser anterior a 'hasta'");
@@ -76,15 +87,29 @@ public class InventarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 366 días");
         }
         Long companyId = currentUserService.requireCurrentCompanyId();
-        if (categoriaId != null) {
+        List<Long> catFilter = normalizeIdList(categoriaIds);
+        List<Long> carpFilter = normalizeIdList(carpetaIds);
+        for (Long categoriaId : catFilter) {
             categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
         }
-        List<MovimientoStock> rows =
-                movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta, categoriaId);
+        for (Long carpetaId : carpFilter) {
+            productoCarpetaRepository.findByIdAndCompany_Id(carpetaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        }
         List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
-                .filter(p -> categoriaId == null || p.getCategorias().stream().anyMatch(c -> c.getId().equals(categoriaId)))
+                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter))
                 .toList();
+        Set<Long> productoIds = new HashSet<>();
+        for (Producto p : productos) {
+            productoIds.add(p.getId());
+        }
+        List<MovimientoStock> rows = movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
+        if (!catFilter.isEmpty() || !carpFilter.isEmpty()) {
+            rows = rows.stream()
+                    .filter(m -> productoIds.contains(m.getProducto().getId()))
+                    .toList();
+        }
 
         long unidadesEntrada = 0;
         long unidadesSalida = 0;
@@ -248,6 +273,28 @@ public class InventarioService {
         movimientoStockRepository.save(m);
 
         return toResponse(m);
+    }
+
+    private static List<Long> normalizeIdList(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream().filter(id -> id != null && id > 0).distinct().toList();
+    }
+
+    private static boolean matchesEstadisticasFilters(Producto p, List<Long> categoriaIds, List<Long> carpetaIds) {
+        if (!categoriaIds.isEmpty()) {
+            boolean tieneCategoria = p.getCategorias().stream().anyMatch(c -> categoriaIds.contains(c.getId()));
+            if (!tieneCategoria) {
+                return false;
+            }
+        }
+        if (!carpetaIds.isEmpty()) {
+            if (p.getCarpeta() == null || !carpetaIds.contains(p.getCarpeta().getId())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String normalizeObservacion(String raw) {

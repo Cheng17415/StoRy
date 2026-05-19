@@ -195,7 +195,6 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           <header class="page-head">
         <div class="page-head-text">
           <h1 class="page-title">Productos</h1>
-          <p class="page-sub">Tu catálogo y carpetas, todo a mano.</p>
         </div>
         <div class="page-head-actions">
           @if (canManageFolders()) {
@@ -427,7 +426,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                   Renombrar
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                                  Mover…
+                                  Mover
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                                   Clonar carpeta
@@ -493,7 +492,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                   Clonar
                                 </button>
                                 <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
-                                  Mover a carpeta…
+                                  Mover a carpeta
                                 </button>
                               }
                               @if (canDeleteProduct()) {
@@ -613,7 +612,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                               Renombrar
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                              Mover…
+                              Mover
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                               Clonar carpeta
@@ -683,7 +682,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                               Clonar
                             </button>
                             <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveProductDialog(p)">
-                              Mover a carpeta…
+                              Mover a carpeta
                             </button>
                           }
                           @if (canDeleteProduct()) {
@@ -796,7 +795,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                     Renombrar
                                   </button>
                                   <button type="button" role="menuitem" class="card-dd-item" (click)="openMoveFolderDialog(d)">
-                                    Mover…
+                                    Mover
                                   </button>
                                   <button type="button" role="menuitem" class="card-dd-item" (click)="cloneFolderConfirm(d)">
                                     Clonar carpeta
@@ -881,7 +880,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                                     class="card-dd-item"
                                     (click)="openMoveProductDialog(p)"
                                   >
-                                    Mover a carpeta…
+                                    Mover a carpeta
                                   </button>
                                 }
                                 @if (canDeleteProduct()) {
@@ -963,19 +962,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         <h3>{{ dialogTitle() }}</h3>
         <form [formGroup]="form" (ngSubmit)="save()">
           <label>
-            Nombre
+            <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="text" formControlName="nombre" />
           </label>
           <label>
-            Cantidad
+            <span class="field-label">Cantidad <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="number" formControlName="cantidad" min="0" step="1" />
           </label>
           <label>
-            Precio
+            <span class="field-label">Precio <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="number" formControlName="precio" min="0" step="0.01" />
           </label>
           <label>
-            Stock mínimo (opcional)
+            <span class="field-label">Stock mínimo</span>
             <input
               type="number"
               formControlName="stockMinimo"
@@ -983,12 +982,47 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               step="1"
               placeholder="Sin umbral"
             />
-            <span class="field-hint">Si la cantidad es menor, el nombre se muestra en rojo.</span>
           </label>
           <label>
-            Notas (opcional)
+            Notas
             <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre el producto"></textarea>
           </label>
+          <div class="photo-field">
+            <span class="photo-field-label">Imagen</span>
+            @if (previewUrl() || dialogImageUrl()) {
+              <img
+                [src]="previewUrl() || dialogImageUrl()!"
+                alt=""
+                class="photo-preview"
+              />
+            }
+            <div class="photo-upload">
+              <div class="photo-upload-inner">
+                <svg
+                  class="photo-upload-icon"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
+                  />
+                </svg>
+                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
+              </div>
+              <input
+                type="file"
+                class="photo-upload-input"
+                aria-label="Subir imagen del producto"
+                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
+                (change)="onFile($event)"
+              />
+            </div>
+          </div>
           @if (formError()) {
             <p class="error">{{ formError() }}</p>
           }
@@ -1007,11 +1041,11 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
         <h3>Nueva carpeta</h3>
         <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
           <label>
-            Nombre
+            <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
             <input type="text" formControlName="nombre" />
           </label>
           <label>
-            Notas (opcional)
+            <span class="field-label">Notas</span>
             <textarea formControlName="descripcion" rows="3" placeholder="Descripción de la carpeta"></textarea>
           </label>
           @if (folderFormError()) {
@@ -2468,6 +2502,16 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       color: #374151;
     }
 
+    .field-label {
+      display: block;
+      line-height: 1.3;
+    }
+
+    .required-mark {
+      color: var(--inv-cta, #b91c1c);
+      font-weight: 700;
+    }
+
     input[type='text'],
     input[type='number'],
     textarea {
@@ -2490,6 +2534,8 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     }
 
     .photo-field {
+      display: flex;
+      flex-direction: column;
       gap: 0.4rem;
     }
 
@@ -2497,6 +2543,15 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       font-size: 0.875rem;
       font-weight: 500;
       color: #374151;
+    }
+
+    .photo-preview {
+      width: 100%;
+      max-height: 10rem;
+      object-fit: contain;
+      border: 1px solid var(--inv-border);
+      border-radius: 8px;
+      background: #fafafa;
     }
 
     .photo-upload {
@@ -2713,6 +2768,9 @@ export class ProductosComponent implements OnInit {
         tap(({ arbol }) => this.latestArbol.set(arbol)),
         map(({ page, allCompany, arbol }) => {
           const qq = q.trim().toLowerCase();
+          const productSource = qq
+            ? this.productosEnAlcanceBusqueda(allCompany, fid, arbol, catId)
+            : page;
           let subcarpetas = this.buildSubcarpetasVm(
             carpetasEnNivel(arbol, fid),
             arbol,
@@ -2723,7 +2781,7 @@ export class ProductosComponent implements OnInit {
           }
           subcarpetas = this.sortSubcarpetas(subcarpetas, sort);
           return {
-            pageData: this.buildPageData(page, q, sort),
+            pageData: this.buildPageData(productSource, q, sort),
             subcarpetas,
           };
         }),
@@ -2742,6 +2800,8 @@ export class ProductosComponent implements OnInit {
   protected readonly dialogTitle = signal('Nuevo producto');
   protected readonly formError = signal('');
   protected readonly saving = signal(false);
+  protected readonly previewUrl = signal<string | null>(null);
+  protected readonly dialogImageUrl = signal<string | null>(null);
 
   private file: File | null = null;
 
@@ -3247,6 +3307,32 @@ export class ProductosComponent implements OnInit {
     }
   }
 
+  /** Productos buscables según carpeta actual: toda la empresa en raíz, o subárbol (sin padres). */
+  private productosEnAlcanceBusqueda(
+    allProducts: ProductoDto[],
+    carpetaId: number | null,
+    arbol: CarpetaArbolDto[],
+    categoriaId: number | null,
+  ): ProductoDto[] {
+    let scoped =
+      carpetaId === null
+        ? allProducts
+        : allProducts.filter((p) => {
+            if (p.carpetaId == null) {
+              return false;
+            }
+            return collectCarpetaSubtreeIds(arbol, carpetaId).has(p.carpetaId);
+          });
+
+    if (categoriaId != null && categoriaId > 0) {
+      scoped = scoped.filter(
+        (p) => p.categorias?.some((c) => c.id === categoriaId) ?? false,
+      );
+    }
+
+    return scoped;
+  }
+
   private buildPageData(list: ProductoDto[], q: string, sort: SortState): ProductosPageData {
     const totalQty = list.reduce((s, p) => s + (p.cantidad ?? 0), 0);
     const totalValue = list.reduce((s, p) => {
@@ -3367,7 +3453,7 @@ export class ProductosComponent implements OnInit {
     this.editingId.set(null);
     this.dialogTitle.set('Nuevo producto');
     this.form.reset({ nombre: '', cantidad: 0, precio: 0, stockMinimo: null, descripcion: '' });
-    this.file = null;
+    this.clearFileSelection();
     this.formError.set('');
     this.dialogRef()?.nativeElement.showModal();
   }
@@ -3382,19 +3468,34 @@ export class ProductosComponent implements OnInit {
       stockMinimo: p.stockMinimo ?? null,
       descripcion: p.descripcion ?? '',
     });
-    this.file = null;
+    this.clearFileSelection();
+    this.dialogImageUrl.set(p.imagen ?? null);
     this.formError.set('');
     this.dialogRef()?.nativeElement.showModal();
   }
 
   protected closeDialog(): void {
+    this.clearFileSelection();
     this.dialogRef()?.nativeElement.close();
   }
 
   protected onFile(ev: Event): void {
     const input = ev.target as HTMLInputElement;
-    const f = input.files?.[0];
-    this.file = f ?? null;
+    const f = input.files?.[0] ?? null;
+    this.file = f;
+    if (this.previewUrl()) {
+      URL.revokeObjectURL(this.previewUrl()!);
+    }
+    this.previewUrl.set(f ? URL.createObjectURL(f) : null);
+  }
+
+  private clearFileSelection(): void {
+    this.file = null;
+    if (this.previewUrl()) {
+      URL.revokeObjectURL(this.previewUrl()!);
+      this.previewUrl.set(null);
+    }
+    this.dialogImageUrl.set(null);
   }
 
   protected save(): void {

@@ -26,9 +26,9 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       <label class="rm-field">
         <span class="rm-label">Tipo</span>
         <select formControlName="tipo" class="rm-input">
-          <option value="ENTRADA">Entrada (compra, devolución…)</option>
-          <option value="SALIDA">Salida (venta, consumo…)</option>
-          <option value="AJUSTE">Ajuste (fijar stock total)</option>
+          <option value="ENTRADA">Entrada</option>
+          <option value="SALIDA">Salida</option>
+          <option value="AJUSTE">Ajuste</option>
         </select>
       </label>
       <label class="rm-field">

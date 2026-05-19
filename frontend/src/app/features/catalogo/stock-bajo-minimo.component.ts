@@ -27,21 +27,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
         </a>
       </nav>
 
-      <header class="sb-header">
-        <div>
-          <p class="sb-eyebrow">Alertas de inventario</p>
-          <h1 class="sb-title">Stock bajo</h1>
-          <p class="sb-sub">
-            Productos activos con cantidad igual o inferior al mínimo configurado.
-          </p>
-        </div>
-        <div class="sb-hero-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="42" height="42">
-            <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          </svg>
-        </div>
-      </header>
-
       <section class="sb-summary" aria-label="Resumen de stock bajo">
         <article class="sb-summary-card">
           <span class="summary-icon summary-icon--red" aria-hidden="true">
@@ -184,7 +169,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
         @if (movProducto(); as pr) {
           <div class="sb-dialog-inner">
             <h2 class="sb-dialog-title">Registrar movimiento</h2>
-            <p class="sb-dialog-name">{{ pr.nombre }} · actual {{ pr.cantidad }} uds.</p>
+            <p class="sb-dialog-name">{{ pr.nombre }} · actual {{ pr.cantidad }}.</p>
             <app-registrar-movimiento [producto]="pr" (completado)="onMovimientoHecho()" />
             <button type="button" class="sb-dialog-close" (click)="cerrarMovimiento()">Cerrar</button>
           </div>

@@ -18,7 +18,7 @@ import { RouterLink } from '@angular/router';
             <span class="accent">en un solo sitio claro.</span>
           </h1>
           <p class="lede">
-            Controla productos, carpetas y cada movimiento de stock con tu equipo — sin el caos de las hojas de cálculo.
+            Controla productos, carpetas y cada movimiento de stock con tu equipo.
           </p>
           <div class="hero-cta">
             <a routerLink="/register" class="btn-primary">
@@ -115,7 +115,7 @@ import { RouterLink } from '@angular/router';
       </section>
 
       <section class="features" aria-labelledby="features-title">
-        <h2 id="features-title" class="section-title">Todo lo que tu inventario necesita.<span> Nada de relleno.</span></h2>
+        <h2 id="features-title" class="section-title">Todo lo que tu inventario necesita.</h2>
 
         <ul class="feature-grid">
           <li class="feature-card">
@@ -125,7 +125,7 @@ import { RouterLink } from '@angular/router';
               </svg>
             </div>
             <h3>Catálogo y carpetas</h3>
-            <p>Organiza tus productos en un árbol de carpetas con códigos, precios e imágenes por empresa.</p>
+            <p>Organiza tus productos en un árbol de carpetas.</p>
           </li>
 
           <li class="feature-card">

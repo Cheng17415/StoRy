@@ -668,7 +668,7 @@ export class RegisterComponent implements OnInit {
     this.error.set('');
     this.loading.set(true);
     this.auth.register(this.form.getRawValue()).subscribe({
-      next: () => void this.router.navigateByUrl('/productos'),
+      next: () => void this.router.navigateByUrl('/empresa'),
       error: (err: { error?: { message?: string }; message?: string }) => {
         this.loading.set(false);
         const msg = err?.error?.message ?? err?.message ?? 'Error al registrarse';
@@ -682,7 +682,7 @@ export class RegisterComponent implements OnInit {
     this.error.set('');
     this.loading.set(true);
     this.auth.loginWithGoogle(credential).subscribe({
-      next: () => void this.router.navigateByUrl('/productos'),
+      next: () => void this.router.navigateByUrl('/empresa'),
       error: (err: { error?: { message?: string }; message?: string }) => {
         this.loading.set(false);
         const msg = err?.error?.message ?? err?.message ?? 'Error con Google';

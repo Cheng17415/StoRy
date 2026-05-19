@@ -37,6 +37,7 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     @Query("""
             SELECT DISTINCT p FROM Producto p
             LEFT JOIN FETCH p.categorias
+            LEFT JOIN FETCH p.carpeta
             WHERE p.company.id = :companyId
             ORDER BY p.fechaActualizacion DESC
             """)

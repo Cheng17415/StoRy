@@ -5,7 +5,7 @@
     <span class="brand-text">{{ title }}</span>
   </a>
   <nav>
-    @if (auth.loggedIn()) {
+    @if (auth.loggedIn() && auth.inCompany()) {
       <a routerLink="/productos" routerLinkActive="active">Productos</a>
       @if (puedeVerEstadisticas()) {
         <a routerLink="/estadisticas" routerLinkActive="active">Estadísticas</a>

@@ -1,10 +1,25 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { InventarioEstadisticasDto, CategoriaDto } from '../../core/models/catalogo.models';
+import { InventarioEstadisticasDto, CarpetaArbolDto, CategoriaDto } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
+
+interface CarpetaOpcion {
+  id: number;
+  nombre: string;
+  depth: number;
+}
+
+function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
+  const out: CarpetaOpcion[] = [];
+  for (const n of nodes) {
+    out.push({ id: n.id, nombre: n.nombre, depth });
+    out.push(...flattenCarpetas(n.hijos, depth + 1));
+  }
+  return out;
+}
 
 @Component({
   selector: 'app-estadisticas',
@@ -12,25 +27,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
   imports: [RouterLink, CurrencyPipe],
   template: `
     <div class="stats-page">
-      <header class="stats-head">
-        <div class="stats-head-copy">
-          <p class="eyebrow">Panel de inventario</p>
-          <h1>Estadísticas</h1>
-          <p class="stats-intro">
-            Lectura rápida de movimientos, valor actual, stock bajo y actividad del periodo.
-          </p>
-        </div>
-        <div class="stats-head-visual" aria-hidden="true">
-          <div class="mini-bars">
-            <span style="--h: 42%"></span>
-            <span style="--h: 64%"></span>
-            <span style="--h: 36%"></span>
-            <span class="accent" style="--h: 88%"></span>
-            <span style="--h: 58%"></span>
-          </div>
-        </div>
-      </header>
-
       <section class="stats-filters" aria-labelledby="filtros-stats">
         <h2 id="filtros-stats" class="sr-only">Filtros</h2>
         <div class="filters-row">
@@ -41,19 +37,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
           <label>
             Hasta
             <input type="date" [value]="hastaStr()" (change)="onHasta($event)" />
-          </label>
-          <label class="stats-cat-filter">
-            Categoría
-            <select
-              class="stats-cat-select"
-              [value]="categoriaFiltro() != null ? '' + categoriaFiltro() : ''"
-              (change)="onCategoriaFiltroChange($event)"
-            >
-              <option value="">Todas</option>
-              @for (c of categorias(); track c.id) {
-                <option [value]="'' + c.id">{{ c.nombre }}</option>
-              }
-            </select>
           </label>
           <button type="button" class="btn-apply" (click)="cargar()" [disabled]="loading()">
             @if (loading()) {
@@ -66,6 +49,60 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
               Actualizar
             }
           </button>
+        </div>
+        <div class="filters-multi" aria-label="Filtros por carpeta y categoría">
+          <div class="filter-panel">
+            <div class="filter-panel-head">
+              <span class="filter-panel-title">Carpetas</span>
+              @if (carpetasSeleccionadas().length > 0) {
+                <button type="button" class="filter-clear" (click)="limpiarCarpetas()">Quitar todas</button>
+              }
+            </div>
+            @if (carpetasOpciones().length === 0) {
+              <p class="stats-muted filter-empty">No hay carpetas.</p>
+            } @else {
+              <ul class="filter-checklist">
+                @for (c of carpetasOpciones(); track c.id) {
+                  <li [style.padding-left.rem]="0.35 + c.depth * 0.85">
+                    <label class="filter-check">
+                      <input
+                        type="checkbox"
+                        [checked]="carpetaSeleccionada(c.id)"
+                        (change)="onCarpetaCheck(c.id, $event)"
+                      />
+                      <span>{{ c.nombre }}</span>
+                    </label>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          <div class="filter-panel">
+            <div class="filter-panel-head">
+              <span class="filter-panel-title">Categorías</span>
+              @if (categoriasSeleccionadas().length > 0) {
+                <button type="button" class="filter-clear" (click)="limpiarCategorias()">Quitar todas</button>
+              }
+            </div>
+            @if (categorias().length === 0) {
+              <p class="stats-muted filter-empty">No hay categorías.</p>
+            } @else {
+              <ul class="filter-checklist">
+                @for (c of categorias(); track c.id) {
+                  <li>
+                    <label class="filter-check">
+                      <input
+                        type="checkbox"
+                        [checked]="categoriaSeleccionada(c.id)"
+                        (change)="onCategoriaCheck(c.id, $event)"
+                      />
+                      <span>{{ c.nombre }}</span>
+                    </label>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
         </div>
         @if (errorMsg()) {
           <p class="stats-error" role="alert">{{ errorMsg() }}</p>
@@ -128,40 +165,17 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
             <span class="kpi-label">Movimientos</span>
             <span class="kpi-value">{{ d.totalMovimientos }}</span>
           </article>
-          <article class="kpi compact kpi-entrada">
+          <article class="kpi compact">
             <span class="kpi-label">Unidades entrada</span>
             <span class="kpi-value">{{ d.unidadesEntrada }}</span>
           </article>
-          <article class="kpi compact kpi-salida">
+          <article class="kpi compact">
             <span class="kpi-label">Unidades salida</span>
             <span class="kpi-value">{{ d.unidadesSalida }}</span>
           </article>
           <article class="kpi compact">
             <span class="kpi-label">Balance neto</span>
             <span class="kpi-value" [class.negative]="balanceNeto(d) < 0">{{ balanceNeto(d) }}</span>
-          </article>
-        </section>
-
-        <section class="insight-grid" aria-label="Lecturas rápidas">
-          <article class="insight-card">
-            <span class="insight-label">Días con actividad</span>
-            <strong>{{ diasActivos(d) }}</strong>
-            <p>De {{ diasPeriodo() }} días en el rango.</p>
-          </article>
-          <article class="insight-card">
-            <span class="insight-label">Media de salidas</span>
-            <strong>{{ mediaSalidasDia(d) }}</strong>
-            <p>Unidades retiradas por día activo.</p>
-          </article>
-          <article class="insight-card">
-            <span class="insight-label">Pico de salidas</span>
-            <strong>{{ picoSalidas(d).unidades }}</strong>
-            <p>{{ picoSalidas(d).fecha || 'Sin salidas registradas' }}</p>
-          </article>
-          <article class="insight-card">
-            <span class="insight-label">Top producto</span>
-            <strong>{{ porcentajeTopProducto(d) }}%</strong>
-            <p>Concentración de salidas en el producto más movido.</p>
           </article>
         </section>
 
@@ -429,12 +443,86 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       font-size: 0.88rem;
     }
 
-    .kpi-row,
-    .insight-grid {
+    .kpi-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
       gap: 0.75rem;
       margin-bottom: 1rem;
+    }
+
+    .filters-multi {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+    }
+
+    .filter-panel {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--story-border);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .filter-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .filter-panel-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--story-text-muted);
+    }
+
+    .filter-clear {
+      border: none;
+      background: none;
+      padding: 0;
+      color: var(--story-primary);
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .filter-clear:hover {
+      text-decoration: underline;
+    }
+
+    .filter-empty {
+      margin: 0;
+      font-size: 0.86rem;
+    }
+
+    .filter-checklist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 9.5rem;
+      overflow: auto;
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .filter-check {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.88rem;
+      color: #0f172a;
+      cursor: pointer;
+    }
+
+    .filter-check input {
+      width: 0.95rem;
+      height: 0.95rem;
+      accent-color: var(--story-primary);
     }
 
     .kpi {
@@ -457,14 +545,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
     .kpi.compact {
       display: block;
       border-left: 4px solid transparent;
-    }
-
-    .kpi-entrada {
-      border-left-color: var(--story-success) !important;
-    }
-
-    .kpi-salida {
-      border-left-color: var(--story-accent) !important;
     }
 
     .kpi-danger {
@@ -506,40 +586,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
 
     .kpi-value.negative {
       color: var(--story-danger);
-    }
-
-    .insight-card {
-      padding: 1rem;
-      background:
-        radial-gradient(280px 100px at 0% 0%, rgba(30, 64, 175, 0.08), transparent 70%),
-        var(--story-surface);
-      border: 1px solid var(--story-border);
-      border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-    }
-
-    .insight-label {
-      display: block;
-      margin-bottom: 0.3rem;
-      color: var(--story-text-muted);
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .insight-card strong {
-      display: block;
-      color: #0f172a;
-      font-size: 1.45rem;
-      letter-spacing: -0.02em;
-    }
-
-    .insight-card p {
-      margin: 0.3rem 0 0;
-      color: #64748b;
-      font-size: 0.86rem;
-      line-height: 1.45;
     }
 
     .stats-layout {
@@ -765,8 +811,11 @@ export class EstadisticasComponent implements OnInit {
 
   protected readonly desdeStr = signal(EstadisticasComponent.defaultDesde());
   protected readonly hastaStr = signal(EstadisticasComponent.defaultHasta());
-  protected readonly categoriaFiltro = signal<number | null>(null);
+  protected readonly categoriasSeleccionadas = signal<number[]>([]);
+  protected readonly carpetasSeleccionadas = signal<number[]>([]);
   protected readonly categorias = signal<CategoriaDto[]>([]);
+  private readonly carpetasArbol = signal<CarpetaArbolDto[]>([]);
+  protected readonly carpetasOpciones = computed(() => flattenCarpetas(this.carpetasArbol()));
   protected readonly data = signal<InventarioEstadisticasDto | null>(null);
   protected readonly loading = signal(false);
   protected readonly errorMsg = signal<string | null>(null);
@@ -775,6 +824,10 @@ export class EstadisticasComponent implements OnInit {
     this.api.getCategorias().subscribe({
       next: (list) => this.categorias.set(list),
       error: () => this.categorias.set([]),
+    });
+    this.api.getCarpetasArbol().subscribe({
+      next: (arbol) => this.carpetasArbol.set(arbol),
+      error: () => this.carpetasArbol.set([]),
     });
     this.cargar();
   }
@@ -804,21 +857,48 @@ export class EstadisticasComponent implements OnInit {
     if (v) this.hastaStr.set(v);
   }
 
-  protected onCategoriaFiltroChange(ev: Event): void {
-    const raw = (ev.target as HTMLSelectElement).value;
-    if (raw === '') {
-      this.categoriaFiltro.set(null);
-      return;
-    }
-    const id = Number(raw);
-    this.categoriaFiltro.set(Number.isFinite(id) ? id : null);
+  protected categoriaSeleccionada(id: number): boolean {
+    return this.categoriasSeleccionadas().includes(id);
+  }
+
+  protected carpetaSeleccionada(id: number): boolean {
+    return this.carpetasSeleccionadas().includes(id);
+  }
+
+  protected onCategoriaCheck(id: number, ev: Event): void {
+    const checked = (ev.target as HTMLInputElement).checked;
+    const cur = this.categoriasSeleccionadas();
+    this.categoriasSeleccionadas.set(
+      checked ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter((x) => x !== id),
+    );
+  }
+
+  protected onCarpetaCheck(id: number, ev: Event): void {
+    const checked = (ev.target as HTMLInputElement).checked;
+    const cur = this.carpetasSeleccionadas();
+    this.carpetasSeleccionadas.set(
+      checked ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter((x) => x !== id),
+    );
+  }
+
+  protected limpiarCategorias(): void {
+    this.categoriasSeleccionadas.set([]);
+  }
+
+  protected limpiarCarpetas(): void {
+    this.carpetasSeleccionadas.set([]);
   }
 
   protected cargar(): void {
     this.loading.set(true);
     this.errorMsg.set(null);
     this.api
-      .getInventarioEstadisticas(this.desdeStr(), this.hastaStr(), this.categoriaFiltro())
+      .getInventarioEstadisticas(
+        this.desdeStr(),
+        this.hastaStr(),
+        this.categoriasSeleccionadas(),
+        this.carpetasSeleccionadas(),
+      )
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (d) => {
@@ -843,10 +923,6 @@ export class EstadisticasComponent implements OnInit {
       });
   }
 
-  protected pctSalida(unidades: number): number {
-    return (unidades / this.maxUnidadesEnSerie()) * 100;
-  }
-
   protected pctSerie(unidades: number): number {
     return Math.max(unidades > 0 ? 4 : 0, (unidades / this.maxUnidadesEnSerie()) * 100);
   }
@@ -857,45 +933,5 @@ export class EstadisticasComponent implements OnInit {
 
   protected balanceNeto(d: InventarioEstadisticasDto): number {
     return d.unidadesEntrada - d.unidadesSalida;
-  }
-
-  protected diasActivos(d: InventarioEstadisticasDto): number {
-    return d.seriePorDia.filter(
-      (row) => row.entradasUnidades + row.salidasUnidades + row.ajustesUnidades > 0,
-    ).length;
-  }
-
-  protected diasPeriodo(): number {
-    const desde = new Date(`${this.desdeStr()}T00:00:00Z`).getTime();
-    const hasta = new Date(`${this.hastaStr()}T00:00:00Z`).getTime();
-    if (!Number.isFinite(desde) || !Number.isFinite(hasta) || hasta < desde) {
-      return 0;
-    }
-    return Math.floor((hasta - desde) / 86400000) + 1;
-  }
-
-  protected mediaSalidasDia(d: InventarioEstadisticasDto): number {
-    const activos = this.diasActivos(d);
-    if (activos === 0) {
-      return 0;
-    }
-    return Math.round((d.unidadesSalida / activos) * 10) / 10;
-  }
-
-  protected picoSalidas(d: InventarioEstadisticasDto): { fecha: string; unidades: number } {
-    return d.seriePorDia.reduce(
-      (best, row) =>
-        row.salidasUnidades > best.unidades
-          ? { fecha: row.fecha, unidades: row.salidasUnidades }
-          : best,
-      { fecha: '', unidades: 0 },
-    );
-  }
-
-  protected porcentajeTopProducto(d: InventarioEstadisticasDto): number {
-    if (d.unidadesSalida <= 0 || d.topSalidasProducto.length === 0) {
-      return 0;
-    }
-    return Math.round((d.topSalidasProducto[0].unidadesSalida / d.unidadesSalida) * 100);
   }
 }

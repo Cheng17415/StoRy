@@ -611,6 +611,6 @@ export class LoginComponent implements OnInit {
 
   private navigateAfterLogin(): void {
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    void this.router.navigateByUrl(returnUrl && returnUrl.startsWith('/') ? returnUrl : '/productos');
+    void this.router.navigateByUrl(this.auth.resolvePostAuthUrl(returnUrl));
   }
 }

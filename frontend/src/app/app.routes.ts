@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, estadisticasGuard, landingGuard } from './core/guards/auth.guard';
+import { authGuard, companyGuard, estadisticasGuard, landingGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -10,7 +10,7 @@ export const routes: Routes = [
   },
   {
     path: 'categorias',
-    canActivate: [authGuard],
+    canActivate: [authGuard, companyGuard],
     loadComponent: () =>
       import('./features/catalogo/categorias.component').then((m) => m.CategoriasComponent),
   },
@@ -25,7 +25,7 @@ export const routes: Routes = [
   },
   {
     path: 'productos',
-    canActivate: [authGuard],
+    canActivate: [authGuard, companyGuard],
     loadComponent: () =>
       import('./features/catalogo/productos.component').then((m) => m.ProductosComponent),
   },
@@ -37,13 +37,13 @@ export const routes: Routes = [
   },
   {
     path: 'stock-bajo',
-    canActivate: [authGuard],
+    canActivate: [authGuard, companyGuard],
     loadComponent: () =>
       import('./features/catalogo/stock-bajo-minimo.component').then((m) => m.StockBajoMinimoComponent),
   },
   {
     path: 'producto/:id',
-    canActivate: [authGuard],
+    canActivate: [authGuard, companyGuard],
     loadComponent: () =>
       import('./features/catalogo/producto-detalle.component').then((m) => m.ProductoDetalleComponent),
   },

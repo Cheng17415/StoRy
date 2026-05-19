@@ -179,7 +179,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
               />
             </div>
           </div>
-          <div class="pd-metric pd-metric--accent">
+          <div class="pd-metric">
             <div class="pd-metric-top">
               <span class="pd-metric-label">Valor total</span>
             </div>
@@ -385,8 +385,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
           <dialog #movDialog class="pd-mov-dialog">
             <div class="pd-mov-dialog-inner">
               <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
-              <p class="pd-mov-dialog-sub">{{ p.nombre }} · stock actual {{ p.cantidad }} uds.</p>
-              <p class="pd-mov-dialog-hint">La entrada o salida quedará registrada en el historial.</p>
+              <p class="pd-mov-dialog-sub">{{ p.nombre }} · stock actual {{ p.cantidad }}</p>
               <app-registrar-movimiento [producto]="p" (completado)="onMovimientoModalOk()" />
               <button type="button" class="pd-mov-dialog-close" (click)="closeMovimientoModal()">
                 Cerrar
@@ -533,18 +532,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       border: 1px solid var(--pd-border);
       border-radius: 18px;
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
-      position: relative;
-      overflow: visible;
-    }
-
-    .pd-hero::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--pd-primary) 0%, var(--story-secondary, #3b82f6) 60%, var(--story-accent, #f59e0b) 100%);
     }
 
     .pd-hero-error {
@@ -960,12 +947,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       transform: translateY(-1px);
     }
 
-    .pd-metric--accent {
-      background: linear-gradient(135deg, var(--pd-card) 0%, var(--pd-primary-soft) 120%);
-      border-color: rgba(30, 64, 175, 0.18);
-    }
-
-    .pd-metric--accent .pd-metric-value {
+    .pd-metric-value {
       color: var(--pd-primary);
       font-weight: 800;
       font-variant-numeric: tabular-nums;
