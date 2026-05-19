@@ -171,6 +171,8 @@ export class CatalogoApiService {
     hasta: string,
     categoriaIds: number[] = [],
     carpetaIds: number[] = [],
+    categoriaRaiz = false,
+    carpetaRaiz = false,
   ): Observable<InventarioEstadisticasDto> {
     const cat = categoriaIds.filter((id) => id > 0).map(String);
     const carp = carpetaIds.filter((id) => id > 0).map(String);
@@ -180,6 +182,8 @@ export class CatalogoApiService {
         hasta,
         ...(cat.length > 0 ? { categoriaIds: cat } : {}),
         ...(carp.length > 0 ? { carpetaIds: carp } : {}),
+        ...(categoriaRaiz ? { categoriaRaiz: 'true' } : {}),
+        ...(carpetaRaiz ? { carpetaRaiz: 'true' } : {}),
       },
     });
     return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {

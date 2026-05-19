@@ -60,7 +60,7 @@ import { GoogleSignInButtonComponent } from './google-sign-in-button.component';
               <span class="mini-thumb"></span>
               <div class="mini-text">
                 <span class="mini-name">Producto nuevo</span>
-                <span class="mini-meta">Sin categoría · 0 uds.</span>
+                <span class="mini-meta">Sin categoría - 0 uds.</span>
               </div>
               <span class="mini-pill">Nuevo</span>
             </div>
@@ -113,7 +113,7 @@ import { GoogleSignInButtonComponent } from './google-sign-in-button.component';
           </label>
 
           <label class="field">
-            <span class="field-label">Contraseña <span class="hint">· mín. 8 caracteres</span></span>
+            <span class="field-label">Contraseña <span class="hint"> - mín. 8 caracteres</span></span>
             <span class="field-input">
               <svg class="field-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 11h14v10H5zM8 11V7a4 4 0 1 1 8 0v4" />

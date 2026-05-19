@@ -81,7 +81,7 @@ class InventarioServiceEstadisticasCategoriaTest {
         when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
                 .thenReturn(List.of(movimiento));
 
-        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null);
+        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null, false, false);
 
         assertEquals(1, result.totalMovimientos());
         assertEquals(3, result.unidadesSalida());
@@ -99,10 +99,42 @@ class InventarioServiceEstadisticasCategoriaTest {
         when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
                 .thenReturn(List.of(movimiento));
 
-        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null);
+        var result = inventarioService.estadisticas(desde, hasta, List.of(5L), null, false, false);
 
         assertEquals(0, result.totalMovimientos());
         assertEquals(0, result.unidadesSalida());
+    }
+
+    @Test
+    void estadisticas_carpetaRaiz_includesProductsWithoutFolder() {
+        MovimientoStock movimiento = buildMovimiento(TipoMovimiento.ENTRADA, 2);
+        Producto producto = movimiento.getProducto();
+        producto.setCarpeta(null);
+
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of(producto));
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
+                .thenReturn(List.of(movimiento));
+
+        var result = inventarioService.estadisticas(desde, hasta, List.of(), List.of(), false, true);
+
+        assertEquals(1, result.totalMovimientos());
+        assertEquals(2, result.unidadesEntrada());
+    }
+
+    @Test
+    void estadisticas_categoriaRaiz_includesProductsWithoutCategory() {
+        MovimientoStock movimiento = buildMovimiento(TipoMovimiento.SALIDA, 1);
+        Producto producto = movimiento.getProducto();
+        producto.getCategorias().clear();
+
+        when(productoRepository.findAllByCompany_IdWithCategorias(1L)).thenReturn(List.of(producto));
+        when(movimientoStockRepository.findByCompanyAndFechaRange(1L, desde, hasta))
+                .thenReturn(List.of(movimiento));
+
+        var result = inventarioService.estadisticas(desde, hasta, List.of(), List.of(), true, false);
+
+        assertEquals(1, result.totalMovimientos());
+        assertEquals(1, result.unidadesSalida());
     }
 
     @Test
@@ -111,7 +143,7 @@ class InventarioServiceEstadisticasCategoriaTest {
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> inventarioService.estadisticas(desde, hasta, List.of(99L), null)
+                () -> inventarioService.estadisticas(desde, hasta, List.of(99L), null, false, false)
         );
 
         assertEquals(404, ex.getStatusCode().value());

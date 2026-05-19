@@ -76,7 +76,9 @@ public class InventarioService {
             Instant desde,
             Instant hasta,
             List<Long> categoriaIds,
-            List<Long> carpetaIds
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
     ) {
         currentUserService.requireCompanyAdminOrAnalyticsViewer();
         if (!desde.isBefore(hasta)) {
@@ -98,14 +100,15 @@ public class InventarioService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
         }
         List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
-                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter))
+                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter, categoriaRaiz, carpetaRaiz))
                 .toList();
         Set<Long> productoIds = new HashSet<>();
         for (Producto p : productos) {
             productoIds.add(p.getId());
         }
         List<MovimientoStock> rows = movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
-        if (!catFilter.isEmpty() || !carpFilter.isEmpty()) {
+        boolean filtraProducto = !catFilter.isEmpty() || categoriaRaiz || !carpFilter.isEmpty() || carpetaRaiz;
+        if (filtraProducto) {
             rows = rows.stream()
                     .filter(m -> productoIds.contains(m.getProducto().getId()))
                     .toList();
@@ -114,6 +117,9 @@ public class InventarioService {
         long unidadesEntrada = 0;
         long unidadesSalida = 0;
         long unidadesAjuste = 0;
+        BigDecimal valorEntrada = BigDecimal.ZERO;
+        BigDecimal valorSalida = BigDecimal.ZERO;
+        BigDecimal valorAjuste = BigDecimal.ZERO;
         long cantidadActualTotal = 0;
         long productosBajoMinimo = 0;
         BigDecimal valorInventarioTotal = BigDecimal.ZERO;
@@ -140,9 +146,18 @@ public class InventarioService {
             int c = m.getCantidad();
             bucket.merge(m.getTipo(), (long) c, Long::sum);
             switch (m.getTipo()) {
-                case ENTRADA -> unidadesEntrada += c;
-                case SALIDA -> unidadesSalida += c;
-                case AJUSTE -> unidadesAjuste += c;
+                case ENTRADA -> {
+                    unidadesEntrada += c;
+                    valorEntrada = valorEntrada.add(valorMovimiento(m, c));
+                }
+                case SALIDA -> {
+                    unidadesSalida += c;
+                    valorSalida = valorSalida.add(valorMovimiento(m, c));
+                }
+                case AJUSTE -> {
+                    unidadesAjuste += c;
+                    valorAjuste = valorAjuste.add(valorMovimiento(m, c));
+                }
             }
             if (m.getTipo() == TipoMovimiento.SALIDA) {
                 Producto p = m.getProducto();
@@ -173,6 +188,9 @@ public class InventarioService {
                 unidadesEntrada,
                 unidadesSalida,
                 unidadesAjuste,
+                valorEntrada,
+                valorSalida,
+                valorAjuste,
                 productos.size(),
                 productosBajoMinimo,
                 cantidadActualTotal,
@@ -275,6 +293,17 @@ public class InventarioService {
         return toResponse(m);
     }
 
+    private static BigDecimal valorMovimiento(MovimientoStock m, int unidades) {
+        if (unidades <= 0) {
+            return BigDecimal.ZERO;
+        }
+        Producto p = m.getProducto();
+        if (p.getPrecio() == null) {
+            return BigDecimal.ZERO;
+        }
+        return p.getPrecio().multiply(BigDecimal.valueOf(unidades));
+    }
+
     private static List<Long> normalizeIdList(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
@@ -282,15 +311,31 @@ public class InventarioService {
         return ids.stream().filter(id -> id != null && id > 0).distinct().toList();
     }
 
-    private static boolean matchesEstadisticasFilters(Producto p, List<Long> categoriaIds, List<Long> carpetaIds) {
-        if (!categoriaIds.isEmpty()) {
-            boolean tieneCategoria = p.getCategorias().stream().anyMatch(c -> categoriaIds.contains(c.getId()));
-            if (!tieneCategoria) {
+    private static boolean matchesEstadisticasFilters(
+            Producto p,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
+        if (categoriaRaiz || !categoriaIds.isEmpty()) {
+            boolean sinCategorias = p.getCategorias() == null || p.getCategorias().isEmpty();
+            boolean enCategoriaSeleccionada =
+                    !categoriaIds.isEmpty()
+                            && p.getCategorias().stream().anyMatch(c -> categoriaIds.contains(c.getId()));
+            boolean matchCategoria = (categoriaRaiz && sinCategorias) || enCategoriaSeleccionada;
+            if (!matchCategoria) {
                 return false;
             }
         }
-        if (!carpetaIds.isEmpty()) {
-            if (p.getCarpeta() == null || !carpetaIds.contains(p.getCarpeta().getId())) {
+        if (carpetaRaiz || !carpetaIds.isEmpty()) {
+            boolean sinCarpeta = p.getCarpeta() == null;
+            boolean enCarpetaSeleccionada =
+                    !carpetaIds.isEmpty()
+                            && p.getCarpeta() != null
+                            && carpetaIds.contains(p.getCarpeta().getId());
+            boolean matchCarpeta = (carpetaRaiz && sinCarpeta) || enCarpetaSeleccionada;
+            if (!matchCarpeta) {
                 return false;
             }
         }

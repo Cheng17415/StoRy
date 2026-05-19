@@ -79,6 +79,8 @@ public class ProductoController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @RequestParam(name = "categoriaIds", required = false) List<Long> categoriaIds,
             @RequestParam(name = "carpetaIds", required = false) List<Long> carpetaIds,
+            @RequestParam(name = "categoriaRaiz", defaultValue = "false") boolean categoriaRaiz,
+            @RequestParam(name = "carpetaRaiz", defaultValue = "false") boolean carpetaRaiz,
             @RequestParam(name = "categoriaId", required = false) Long categoriaIdLegacy) {
         if (desde.isAfter(hasta)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
@@ -86,7 +88,8 @@ public class ProductoController {
         Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         List<Long> mergedCategorias = mergeFilterIds(categoriaIds, categoriaIdLegacy);
-        return inventarioService.estadisticas(desdeInstant, hastaInstant, mergedCategorias, carpetaIds);
+        return inventarioService.estadisticas(
+                desdeInstant, hastaInstant, mergedCategorias, carpetaIds, categoriaRaiz, carpetaRaiz);
     }
 
     private static List<Long> mergeFilterIds(List<Long> ids, Long legacyId) {

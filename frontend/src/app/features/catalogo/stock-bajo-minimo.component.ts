@@ -18,15 +18,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
   imports: [RouterLink, RegistrarMovimientoComponent],
   template: `
     <div class="sb-page">
-      <nav class="sb-nav">
-        <a routerLink="/productos" class="sb-back">
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6" />
-          </svg>
-          Volver a productos
-        </a>
-      </nav>
-
       <section class="sb-summary" aria-label="Resumen de stock bajo">
         <article class="sb-summary-card">
           <span class="summary-icon summary-icon--red" aria-hidden="true">
@@ -48,17 +39,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
           <div>
             <span class="summary-label">Déficit total</span>
             <strong class="summary-value">{{ deficitTotal() }}</strong>
-          </div>
-        </article>
-        <article class="sb-summary-card">
-          <span class="summary-icon summary-icon--blue" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18">
-              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-            </svg>
-          </span>
-          <div>
-            <span class="summary-label">Filtro</span>
-            <strong class="summary-value summary-value--small">{{ categoriaActivaLabel() }}</strong>
           </div>
         </article>
       </section>
@@ -165,19 +145,33 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
         </div>
       }
 
-      <dialog #movDialog class="sb-dialog" (cancel)="$event.preventDefault()">
-        @if (movProducto(); as pr) {
-          <div class="sb-dialog-inner">
-            <h2 class="sb-dialog-title">Registrar movimiento</h2>
-            <p class="sb-dialog-name">{{ pr.nombre }} · actual {{ pr.cantidad }}.</p>
-            <app-registrar-movimiento [producto]="pr" (completado)="onMovimientoHecho()" />
-            <button type="button" class="sb-dialog-close" (click)="cerrarMovimiento()">Cerrar</button>
-          </div>
-        }
-      </dialog>
+      @if (canRegistrarMovimiento()) {
+        <dialog #movDialog class="pd-mov-dialog">
+          @if (movProducto(); as pr) {
+            <div class="pd-mov-dialog-inner">
+              <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
+              <p class="pd-mov-dialog-sub">{{ pr.nombre }} - stock actual {{ pr.cantidad }}</p>
+              <app-registrar-movimiento
+                [producto]="pr"
+                (completado)="onMovimientoHecho()"
+                (cancelar)="cerrarMovimiento()"
+              />
+            </div>
+          }
+        </dialog>
+      }
     </div>
   `,
   styles: `
+    :host {
+      --pd-bg: var(--story-bg-page, #f8fafc);
+      --pd-card: var(--story-surface, #ffffff);
+      --pd-border: var(--story-border, #e2e8f0);
+      --pd-muted: var(--story-text-muted, #64748b);
+      --pd-text: var(--story-text, #1e293b);
+      --pd-primary: var(--story-primary, #1e40af);
+    }
+
     .sb-page {
       max-width: 72rem;
       margin: 0 auto;
@@ -315,11 +309,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       color: var(--story-accent-muted);
     }
 
-    .summary-icon--blue {
-      background: rgba(30, 64, 175, 0.10);
-      color: var(--story-primary);
-    }
-
     .summary-label {
       display: block;
       color: var(--story-text-muted);
@@ -335,10 +324,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       color: #0f172a;
       font-size: 1.2rem;
       letter-spacing: -0.015em;
-    }
-
-    .summary-value--small {
-      font-size: 1rem;
     }
 
     .sb-toolbar {
@@ -559,52 +544,36 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       box-shadow: 0 6px 16px rgba(30, 64, 175, 0.28);
     }
 
-    .sb-dialog {
+    .pd-mov-dialog {
       border: none;
       border-radius: 16px;
       padding: 0;
-      max-width: min(100%, 420px);
-      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
+      max-width: min(100%, 440px);
+      width: calc(100% - 2rem);
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
     }
 
-    .sb-dialog::backdrop {
-      background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(2px);
+    .pd-mov-dialog::backdrop {
+      background: rgb(15 23 42 / 0.45);
     }
 
-    .sb-dialog-inner {
+    .pd-mov-dialog-inner {
       padding: 1.35rem 1.5rem 1.25rem;
     }
 
-    .sb-dialog-title {
+    .pd-mov-dialog-title {
       margin: 0 0 0.35rem;
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       font-weight: 700;
-      color: #0f172a;
       letter-spacing: -0.02em;
+      color: var(--pd-text);
     }
 
-    .sb-dialog-name {
-      margin: 0 0 0.85rem;
+    .pd-mov-dialog-sub {
+      margin: 0 0 0.4rem;
       font-size: 0.88rem;
-      color: var(--story-text-muted);
-    }
-
-    .sb-dialog-close {
-      margin-top: 1rem;
-      min-height: 2.35rem;
-      padding: 0 0.95rem;
-      font: inherit;
-      font-size: 0.86rem;
-      border: 1px solid var(--story-border-strong);
-      border-radius: 10px;
-      background: #ffffff;
-      cursor: pointer;
-      color: var(--story-text);
-    }
-
-    .sb-dialog-close:hover {
-      background: #f8fafc;
+      font-weight: 600;
+      color: var(--pd-primary);
     }
 
     @media (max-width: 760px) {
@@ -663,12 +632,6 @@ export class StockBajoMinimoComponent implements OnInit {
 
   protected deficitTotal(): number {
     return this.rows().reduce((sum, p) => sum + this.deficit(p), 0);
-  }
-
-  protected categoriaActivaLabel(): string {
-    const id = this.categoriaFiltro();
-    if (id == null) return 'Todas';
-    return this.categorias().find((c) => c.id === id)?.nombre ?? 'Filtrada';
   }
 
   protected stockMinimoDraftValue(p: ProductoDto): string {

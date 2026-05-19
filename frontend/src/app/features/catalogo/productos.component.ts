@@ -642,7 +642,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                       <p class="list-meta">
                         <span class="card-code">{{ p.codigo }}</span>
                         @if (p.categorias.length) {
-                          <span class="list-cat"> · {{ formatProductoCategorias(p) }}</span>
+                          <span class="list-cat"> - {{ formatProductoCategorias(p) }}</span>
                         }
                       </p>
                     </div>

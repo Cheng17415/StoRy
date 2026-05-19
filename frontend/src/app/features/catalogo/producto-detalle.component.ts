@@ -318,12 +318,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
                 </label>
               </div>
             </section>
-
-            <section class="pd-card pd-card--barcode">
-              <h2 class="pd-card-title">Código e identificación</h2>
-              <p class="pd-barcode-label">Código interno</p>
-              <p class="pd-barcode-num">{{ p.codigo }}</p>
-            </section>
           </div>
 
           <!-- Columna derecha -->
@@ -385,11 +379,12 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
           <dialog #movDialog class="pd-mov-dialog">
             <div class="pd-mov-dialog-inner">
               <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
-              <p class="pd-mov-dialog-sub">{{ p.nombre }} · stock actual {{ p.cantidad }}</p>
-              <app-registrar-movimiento [producto]="p" (completado)="onMovimientoModalOk()" />
-              <button type="button" class="pd-mov-dialog-close" (click)="closeMovimientoModal()">
-                Cerrar
-              </button>
+              <p class="pd-mov-dialog-sub">{{ p.nombre }} - stock actual {{ p.cantidad }}</p>
+              <app-registrar-movimiento
+                [producto]="p"
+                (completado)="onMovimientoModalOk()"
+                (cancelar)="closeMovimientoModal()"
+              />
             </div>
           </dialog>
         }
@@ -801,24 +796,6 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       font-size: 0.82rem;
       line-height: 1.45;
       color: var(--pd-muted);
-    }
-
-    .pd-mov-dialog-close {
-      margin-top: 1rem;
-      padding: 0.45rem 1rem;
-      font: inherit;
-      font-size: 0.86rem;
-      font-weight: 600;
-      border: 1px solid var(--pd-border);
-      border-radius: 8px;
-      background: var(--pd-bg);
-      color: var(--pd-text);
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .pd-mov-dialog-close:hover {
-      background: var(--pd-card);
     }
 
     .pd-btn-edit,

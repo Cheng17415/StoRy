@@ -21,6 +21,13 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
   return out;
 }
 
+type PeriodoPresetId = '7d' | '30d' | '90d' | 'mes' | 'mes-anterior' | 'custom';
+
+interface PeriodoPresetOption {
+  id: PeriodoPresetId;
+  label: string;
+}
+
 @Component({
   selector: 'app-estadisticas',
   standalone: true,
@@ -29,80 +36,190 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
     <div class="stats-page">
       <section class="stats-filters" aria-labelledby="filtros-stats">
         <h2 id="filtros-stats" class="sr-only">Filtros</h2>
-        <div class="filters-row">
-          <label>
-            Desde
-            <input type="date" [value]="desdeStr()" (change)="onDesde($event)" />
-          </label>
-          <label>
-            Hasta
-            <input type="date" [value]="hastaStr()" (change)="onHasta($event)" />
-          </label>
-          <button type="button" class="btn-apply" (click)="cargar()" [disabled]="loading()">
-            @if (loading()) {
-              <span class="spinner" aria-hidden="true"></span>
-              Cargando…
-            } @else {
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 16v5h5M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 8V3h-5" />
+        <article class="filter-card filter-card--period">
+          <header class="filter-card-head">
+            <span class="filter-card-icon filter-card-icon--green" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
               </svg>
-              Actualizar
-            }
-          </button>
-        </div>
-        <div class="filters-multi" aria-label="Filtros por carpeta y categoría">
-          <div class="filter-panel">
-            <div class="filter-panel-head">
-              <span class="filter-panel-title">Carpetas</span>
-              @if (carpetasSeleccionadas().length > 0) {
-                <button type="button" class="filter-clear" (click)="limpiarCarpetas()">Quitar todas</button>
-              }
+            </span>
+            <div class="filter-card-titles">
+              <h3 class="filter-card-title">Periodo</h3>
+              <p class="filter-card-sub">{{ periodoLabel() }}</p>
             </div>
-            @if (carpetasOpciones().length === 0) {
-              <p class="stats-muted filter-empty">No hay carpetas.</p>
-            } @else {
-              <ul class="filter-checklist">
-                @for (c of carpetasOpciones(); track c.id) {
-                  <li [style.padding-left.rem]="0.35 + c.depth * 0.85">
-                    <label class="filter-check">
-                      <input
-                        type="checkbox"
-                        [checked]="carpetaSeleccionada(c.id)"
-                        (change)="onCarpetaCheck(c.id, $event)"
-                      />
-                      <span>{{ c.nombre }}</span>
-                    </label>
-                  </li>
-                }
-              </ul>
+            <button type="button" class="btn-apply" (click)="cargar()" [disabled]="loading() || !rangoValido()">
+              @if (loading()) {
+                <span class="spinner" aria-hidden="true"></span>
+                Cargando…
+              } @else {
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 16v5h5M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 8V3h-5" />
+                </svg>
+                Actualizar
+              }
+            </button>
+          </header>
+          <div class="date-presets" role="group" aria-label="Periodos rápidos">
+            @for (opt of periodoPresets; track opt.id) {
+              <button
+                type="button"
+                class="date-preset-chip"
+                [class.date-preset-chip--active]="presetActivo() === opt.id"
+                [attr.aria-pressed]="presetActivo() === opt.id"
+                (click)="aplicarPreset(opt.id)"
+              >
+                {{ opt.label }}
+              </button>
             }
           </div>
-          <div class="filter-panel">
-            <div class="filter-panel-head">
-              <span class="filter-panel-title">Categorías</span>
-              @if (categoriasSeleccionadas().length > 0) {
-                <button type="button" class="filter-clear" (click)="limpiarCategorias()">Quitar todas</button>
+          <div class="date-range">
+            <div class="date-field">
+              <label class="date-field-label" for="stats-desde">Desde</label>
+              <div class="date-input-wrap">
+                <svg class="date-input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                </svg>
+                <input
+                  id="stats-desde"
+                  type="date"
+                  class="date-input"
+                  [value]="desdeStr()"
+                  [max]="hastaStr()"
+                  (change)="onDesde($event)"
+                />
+              </div>
+            </div>
+            <span class="date-range-sep" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </span>
+            <div class="date-field">
+              <label class="date-field-label" for="stats-hasta">Hasta</label>
+              <div class="date-input-wrap">
+                <svg class="date-input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                </svg>
+                <input
+                  id="stats-hasta"
+                  type="date"
+                  class="date-input"
+                  [value]="hastaStr()"
+                  [min]="desdeStr()"
+                  (change)="onHasta($event)"
+                />
+              </div>
+            </div>
+          </div>
+          @if (!rangoValido()) {
+            <p class="date-range-error" role="alert">La fecha de inicio no puede ser posterior a la de fin.</p>
+          }
+        </article>
+        <div class="filters-scope" aria-label="Filtros por carpeta y categoría">
+          <article class="filter-card">
+            <header class="filter-card-head">
+              <span class="filter-card-icon filter-card-icon--amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                </svg>
+              </span>
+              <div class="filter-card-titles">
+                <h3 class="filter-card-title">Carpetas</h3>
+                <p class="filter-card-sub">Selecciona una o varias</p>
+              </div>
+              @if (filtrosCarpetaActivos() > 0) {
+                <span class="filter-badge">{{ filtrosCarpetaActivos() }}</span>
+                <button type="button" class="filter-clear-btn" (click)="limpiarCarpetas()">Limpiar</button>
+              }
+            </header>
+            <div class="filter-chips" role="group" aria-label="Filtrar por carpeta">
+              <button
+                type="button"
+                class="filter-chip filter-chip--folder filter-chip--root"
+                [class.filter-chip--active]="carpetaRaizSeleccionada()"
+                [attr.aria-pressed]="carpetaRaizSeleccionada()"
+                (click)="toggleCarpetaRaiz()"
+              >
+                @if (carpetaRaizSeleccionada()) {
+                  <svg class="filter-chip-check" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
+                  </svg>
+                }
+                <span class="filter-chip-label">Raíz</span>
+              </button>
+              @for (c of carpetasOpciones(); track c.id) {
+                  <button
+                    type="button"
+                    class="filter-chip filter-chip--folder"
+                    [class.filter-chip--active]="carpetaSeleccionada(c.id)"
+                    [attr.aria-pressed]="carpetaSeleccionada(c.id)"
+                    (click)="toggleCarpetaChip(c.id)"
+                  >
+                    @if (carpetaSeleccionada(c.id)) {
+                      <svg class="filter-chip-check" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                        <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
+                      </svg>
+                    }
+                    <span class="filter-chip-label">{{ c.nombre }}</span>
+                  </button>
+                }
+              @if (carpetasOpciones().length === 0) {
+                <span class="filter-empty-inline">Sin subcarpetas</span>
               }
             </div>
-            @if (categorias().length === 0) {
-              <p class="stats-muted filter-empty">No hay categorías.</p>
-            } @else {
-              <ul class="filter-checklist">
-                @for (c of categorias(); track c.id) {
-                  <li>
-                    <label class="filter-check">
-                      <input
-                        type="checkbox"
-                        [checked]="categoriaSeleccionada(c.id)"
-                        (change)="onCategoriaCheck(c.id, $event)"
-                      />
-                      <span>{{ c.nombre }}</span>
-                    </label>
-                  </li>
+          </article>
+          <article class="filter-card">
+            <header class="filter-card-head">
+              <span class="filter-card-icon filter-card-icon--blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                </svg>
+              </span>
+              <div class="filter-card-titles">
+                <h3 class="filter-card-title">Categorías</h3>
+                <p class="filter-card-sub">Selecciona una o varias</p>
+              </div>
+              @if (filtrosCategoriaActivos() > 0) {
+                <span class="filter-badge">{{ filtrosCategoriaActivos() }}</span>
+                <button type="button" class="filter-clear-btn" (click)="limpiarCategorias()">Limpiar</button>
+              }
+            </header>
+            <div class="filter-chips" role="group" aria-label="Filtrar por categoría">
+              <button
+                type="button"
+                class="filter-chip filter-chip--root"
+                [class.filter-chip--active]="categoriaRaizSeleccionada()"
+                [attr.aria-pressed]="categoriaRaizSeleccionada()"
+                (click)="toggleCategoriaRaiz()"
+              >
+                @if (categoriaRaizSeleccionada()) {
+                  <svg class="filter-chip-check" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
+                  </svg>
                 }
-              </ul>
-            }
-          </div>
+                <span class="filter-chip-label">Raíz</span>
+              </button>
+              @for (c of categorias(); track c.id) {
+                  <button
+                    type="button"
+                    class="filter-chip"
+                    [class.filter-chip--active]="categoriaSeleccionada(c.id)"
+                    [attr.aria-pressed]="categoriaSeleccionada(c.id)"
+                    (click)="toggleCategoriaChip(c.id)"
+                  >
+                    @if (categoriaSeleccionada(c.id)) {
+                      <svg class="filter-chip-check" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                        <path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" />
+                      </svg>
+                    }
+                    <span class="filter-chip-label">{{ c.nombre }}</span>
+                  </button>
+                }
+              @if (categorias().length === 0) {
+                <span class="filter-empty-inline">Sin categorías</span>
+              }
+            </div>
+          </article>
         </div>
         @if (errorMsg()) {
           <p class="stats-error" role="alert">{{ errorMsg() }}</p>
@@ -209,6 +326,57 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
             }
           </section>
 
+          <div class="stats-side">
+          <section class="stats-block pie-block" aria-labelledby="valor-pie-title">
+            <div class="block-head">
+              <h2 id="valor-pie-title">Valor por movimiento</h2>
+              <span class="block-sub">Entradas, salidas y ajustes en el periodo</span>
+            </div>
+            @if (valorMovimientoTotal(d) <= 0) {
+              <p class="stats-muted">No hay valor de movimiento en este rango.</p>
+            } @else {
+              <div class="pie-wrap">
+                <div
+                  class="pie-donut"
+                  role="img"
+                  [attr.aria-label]="pieAriaLabel(d)"
+                  [style.background]="pieConicGradient(d)"
+                >
+                  <div class="pie-center">
+                    <span class="pie-center-label">Total</span>
+                    <strong class="pie-center-value">{{ valorMovimientoTotal(d) | currency: companyCurrency() }}</strong>
+                  </div>
+                </div>
+                <ul class="pie-legend">
+                  <li>
+                    <span class="pie-legend-dot in"></span>
+                    <span class="pie-legend-text">
+                      <span>Entradas</span>
+                      <strong>{{ valorNum(d.valorEntrada) | currency: companyCurrency() }}</strong>
+                      <em>{{ pctValor(d.valorEntrada, d) }}%</em>
+                    </span>
+                  </li>
+                  <li>
+                    <span class="pie-legend-dot out"></span>
+                    <span class="pie-legend-text">
+                      <span>Salidas</span>
+                      <strong>{{ valorNum(d.valorSalida) | currency: companyCurrency() }}</strong>
+                      <em>{{ pctValor(d.valorSalida, d) }}%</em>
+                    </span>
+                  </li>
+                  <li>
+                    <span class="pie-legend-dot adj"></span>
+                    <span class="pie-legend-text">
+                      <span>Ajustes</span>
+                      <strong>{{ valorNum(d.valorAjuste) | currency: companyCurrency() }}</strong>
+                      <em>{{ pctValor(d.valorAjuste, d) }}%</em>
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            }
+          </section>
+
           <section class="stats-block" aria-labelledby="top-title">
             <div class="block-head">
               <h2 id="top-title">Productos más movidos</h2>
@@ -228,6 +396,7 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
               </ol>
             }
           </section>
+          </div>
         </div>
       }
     </div>
@@ -340,49 +509,125 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
     }
 
-    .filters-row {
+    .filter-card--period {
+      margin-bottom: 0;
+      border: none;
+      box-shadow: none;
+      padding: 0.15rem 0.1rem 0.85rem;
+    }
+
+    .filter-card-icon--green {
+      background: rgba(22, 163, 74, 0.12);
+      color: #15803d;
+    }
+
+    .date-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .date-preset-chip {
+      border: 1px solid var(--story-border-strong);
+      border-radius: 999px;
+      background: #ffffff;
+      padding: 0.38rem 0.75rem;
+      color: #334155;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .date-preset-chip:hover {
+      border-color: #15803d;
+      background: rgba(22, 163, 74, 0.06);
+      color: #14532d;
+    }
+
+    .date-preset-chip--active {
+      border-color: #15803d;
+      background: rgba(22, 163, 74, 0.12);
+      color: #14532d;
+      box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.18);
+    }
+
+    .date-range {
       display: flex;
       flex-wrap: wrap;
       align-items: flex-end;
-      gap: 0.75rem;
+      gap: 0.65rem;
     }
 
-    .filters-row label {
+    .date-field {
+      flex: 1 1 10rem;
+      min-width: min(100%, 10rem);
       display: flex;
       flex-direction: column;
       gap: 0.35rem;
-      font-size: 0.78rem;
+    }
+
+    .date-field-label {
+      font-size: 0.72rem;
       font-weight: 700;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
       color: var(--story-text-muted);
     }
 
-    .filters-row input[type='date'],
-    .stats-cat-select {
-      min-height: 2.5rem;
-      padding: 0.55rem 0.75rem;
+    .date-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .date-input-icon {
+      position: absolute;
+      left: 0.75rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+
+    .date-input {
+      width: 100%;
+      min-height: 2.55rem;
+      padding: 0.55rem 0.75rem 0.55rem 2.35rem;
       border: 1px solid var(--story-border-strong);
       border-radius: 10px;
-      background: var(--story-surface);
+      background: #ffffff;
       color: #0f172a;
       font: inherit;
       font-size: 0.9rem;
-      text-transform: none;
-      letter-spacing: 0;
       transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
 
-    .filters-row input[type='date']:focus,
-    .stats-cat-select:focus {
-      outline: none;
-      border-color: var(--story-primary);
-      box-shadow: 0 0 0 3px var(--story-focus-ring);
+    .date-input:hover {
+      border-color: #cbd5e1;
     }
 
-    .stats-cat-select {
-      min-width: 12rem;
-      cursor: pointer;
+    .date-input:focus {
+      outline: none;
+      border-color: #15803d;
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+    }
+
+    .date-range-sep {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: center;
+      width: 2rem;
+      height: 2rem;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+
+    .date-range-error {
+      margin: 0.65rem 0 0;
+      font-size: 0.82rem;
+      color: var(--story-danger);
     }
 
     .btn-apply {
@@ -450,79 +695,181 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
       margin-bottom: 1rem;
     }
 
-    .filters-multi {
+    .filters-scope {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
       gap: 0.75rem;
       margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--story-border);
     }
 
-    .filter-panel {
-      padding: 0.65rem 0.75rem;
+    .filter-card {
+      padding: 0.95rem 1rem;
+      background: var(--story-surface);
       border: 1px solid var(--story-border);
-      border-radius: 10px;
-      background: #f8fafc;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
     }
 
-    .filter-panel-head {
+    .filter-card-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      gap: 0.7rem;
+      margin-bottom: 0.75rem;
     }
 
-    .filter-panel-title {
-      font-size: 0.72rem;
+    .filter-card-icon {
+      width: 2.35rem;
+      height: 2.35rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 11px;
+      flex-shrink: 0;
+    }
+
+    .filter-card-icon--amber {
+      background: rgba(245, 158, 11, 0.14);
+      color: var(--story-accent-muted);
+    }
+
+    .filter-card-icon--blue {
+      background: rgba(30, 64, 175, 0.10);
+      color: var(--story-primary);
+    }
+
+    .filter-card-titles {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .filter-card-title {
+      margin: 0;
+      font-size: 0.92rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--story-text-muted);
+      letter-spacing: -0.01em;
+      color: #0f172a;
     }
 
-    .filter-clear {
-      border: none;
-      background: none;
-      padding: 0;
+    .filter-card-sub {
+      margin: 0.15rem 0 0;
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+
+    .filter-badge {
+      min-width: 1.5rem;
+      height: 1.5rem;
+      padding: 0 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--story-primary);
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .filter-clear-btn {
+      border: 1px solid var(--story-border-strong);
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 0.3rem 0.55rem;
       color: var(--story-primary);
       font: inherit;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       font-weight: 600;
       cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
     }
 
-    .filter-clear:hover {
-      text-decoration: underline;
+    .filter-clear-btn:hover {
+      background: rgba(30, 64, 175, 0.06);
+      border-color: var(--story-primary);
     }
 
     .filter-empty {
       margin: 0;
-      font-size: 0.86rem;
-    }
-
-    .filter-checklist {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 9.5rem;
-      overflow: auto;
-      display: grid;
-      gap: 0.25rem;
-    }
-
-    .filter-check {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
       font-size: 0.88rem;
-      color: #0f172a;
-      cursor: pointer;
+      color: var(--story-text-muted);
     }
 
-    .filter-check input {
-      width: 0.95rem;
-      height: 0.95rem;
-      accent-color: var(--story-primary);
+    .filter-empty-inline {
+      align-self: center;
+      font-size: 0.82rem;
+      color: var(--story-text-muted);
+      font-style: italic;
+    }
+
+    .filter-chip--root {
+      border-style: dashed;
+    }
+
+    .filter-chip--root.filter-chip--active {
+      border-style: solid;
+    }
+
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 0.45rem;
+      max-height: 8.5rem;
+      overflow: auto;
+      padding: 0.1rem;
+    }
+
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      max-width: 100%;
+      padding: 0.38rem 0.7rem;
+      border: 1px solid var(--story-border-strong);
+      border-radius: 999px;
+      background: #ffffff;
+      color: #334155;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease;
+    }
+
+    .filter-chip:hover {
+      border-color: var(--story-primary);
+      background: rgba(30, 64, 175, 0.04);
+    }
+
+    .filter-chip--active {
+      border-color: var(--story-primary);
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--story-primary);
+      box-shadow: 0 0 0 1px rgba(30, 64, 175, 0.12);
+    }
+
+    .filter-chip--folder.filter-chip--active {
+      border-color: var(--story-accent-muted);
+      background: rgba(245, 158, 11, 0.12);
+      color: #b45309;
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+    }
+
+    .filter-chip-check {
+      flex-shrink: 0;
+    }
+
+    .filter-chip-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .kpi {
@@ -593,6 +940,112 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
       grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.8fr);
       gap: 1rem;
       align-items: start;
+    }
+
+    .stats-side {
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+    }
+
+    .pie-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+    }
+
+    .pie-donut {
+      position: relative;
+      width: 10rem;
+      height: 10rem;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+    }
+
+    .pie-donut::after {
+      content: '';
+      position: absolute;
+      inset: 24%;
+      border-radius: 50%;
+      background: var(--story-surface);
+      box-shadow: 0 0 0 1px var(--story-border);
+    }
+
+    .pie-center {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .pie-center-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--story-text-muted);
+    }
+
+    .pie-center-value {
+      margin-top: 0.15rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .pie-legend {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.65rem;
+      min-width: 11rem;
+    }
+
+    .pie-legend li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+    }
+
+    .pie-legend-dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 999px;
+      margin-top: 0.2rem;
+      flex-shrink: 0;
+    }
+
+    .pie-legend-dot.in { background: #16a34a; }
+    .pie-legend-dot.out { background: #f59e0b; }
+    .pie-legend-dot.adj { background: #7c3aed; }
+
+    .pie-legend-text {
+      display: grid;
+      gap: 0.1rem;
+      font-size: 0.86rem;
+      color: #64748b;
+    }
+
+    .pie-legend-text strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .pie-legend-text em {
+      font-style: normal;
+      font-size: 0.78rem;
+      color: var(--story-text-muted);
     }
 
     .stats-block {
@@ -776,12 +1229,26 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
         padding-inline: 0.25rem;
       }
 
-      .filters-row > * {
-        width: 100%;
+      .filters-scope {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-card-head {
+        flex-wrap: wrap;
       }
 
       .btn-apply {
         width: 100%;
+      }
+
+      .date-range {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .date-range-sep {
+        align-self: center;
+        transform: rotate(90deg);
       }
 
       .day-row {
@@ -809,10 +1276,26 @@ export class EstadisticasComponent implements OnInit {
 
   private readonly maxUnidadesEnSerie = signal(1);
 
+  protected readonly periodoPresets: PeriodoPresetOption[] = [
+    { id: '7d', label: '7 días' },
+    { id: '30d', label: '30 días' },
+    { id: '90d', label: '90 días' },
+    { id: 'mes', label: 'Este mes' },
+    { id: 'mes-anterior', label: 'Mes anterior' },
+  ];
+
   protected readonly desdeStr = signal(EstadisticasComponent.defaultDesde());
   protected readonly hastaStr = signal(EstadisticasComponent.defaultHasta());
+  protected readonly presetActivo = signal<PeriodoPresetId>('30d');
+  protected readonly periodoLabel = computed(() => {
+    const fmt = EstadisticasComponent.formatFechaCorta;
+    return `${fmt(this.desdeStr())} – ${fmt(this.hastaStr())}`;
+  });
+  protected readonly rangoValido = computed(() => this.desdeStr() <= this.hastaStr());
   protected readonly categoriasSeleccionadas = signal<number[]>([]);
   protected readonly carpetasSeleccionadas = signal<number[]>([]);
+  protected readonly categoriaRaizSeleccionada = signal(false);
+  protected readonly carpetaRaizSeleccionada = signal(false);
   protected readonly categorias = signal<CategoriaDto[]>([]);
   private readonly carpetasArbol = signal<CarpetaArbolDto[]>([]);
   protected readonly carpetasOpciones = computed(() => flattenCarpetas(this.carpetasArbol()));
@@ -847,14 +1330,64 @@ export class EstadisticasComponent implements OnInit {
     return d.toISOString().slice(0, 10);
   }
 
+  private static formatFechaCorta(ymd: string): string {
+    const [y, m, d] = ymd.split('-').map(Number);
+    if (!y || !m || !d) {
+      return ymd;
+    }
+    return new Intl.DateTimeFormat('es', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(y, m - 1, d));
+  }
+
+  protected aplicarPreset(preset: PeriodoPresetId): void {
+    const hoy = new Date();
+    let desde: Date;
+    let hasta = hoy;
+
+    switch (preset) {
+      case '7d':
+        desde = new Date(hoy.getTime() - 6 * 86400000);
+        break;
+      case '30d':
+        desde = new Date(hoy.getTime() - 29 * 86400000);
+        break;
+      case '90d':
+        desde = new Date(hoy.getTime() - 89 * 86400000);
+        break;
+      case 'mes':
+        desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        break;
+      case 'mes-anterior':
+        desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        break;
+      default:
+        return;
+    }
+
+    this.desdeStr.set(EstadisticasComponent.toYmdUtc(desde));
+    this.hastaStr.set(EstadisticasComponent.toYmdUtc(hasta));
+    this.presetActivo.set(preset);
+    this.cargar();
+  }
+
   protected onDesde(ev: Event): void {
     const v = (ev.target as HTMLInputElement).value;
-    if (v) this.desdeStr.set(v);
+    if (v) {
+      this.desdeStr.set(v);
+      this.presetActivo.set('custom');
+    }
   }
 
   protected onHasta(ev: Event): void {
     const v = (ev.target as HTMLInputElement).value;
-    if (v) this.hastaStr.set(v);
+    if (v) {
+      this.hastaStr.set(v);
+      this.presetActivo.set('custom');
+    }
   }
 
   protected categoriaSeleccionada(id: number): boolean {
@@ -865,31 +1398,50 @@ export class EstadisticasComponent implements OnInit {
     return this.carpetasSeleccionadas().includes(id);
   }
 
-  protected onCategoriaCheck(id: number, ev: Event): void {
-    const checked = (ev.target as HTMLInputElement).checked;
+  protected toggleCategoriaChip(id: number): void {
     const cur = this.categoriasSeleccionadas();
     this.categoriasSeleccionadas.set(
-      checked ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter((x) => x !== id),
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
     );
   }
 
-  protected onCarpetaCheck(id: number, ev: Event): void {
-    const checked = (ev.target as HTMLInputElement).checked;
+  protected toggleCarpetaChip(id: number): void {
     const cur = this.carpetasSeleccionadas();
     this.carpetasSeleccionadas.set(
-      checked ? (cur.includes(id) ? cur : [...cur, id]) : cur.filter((x) => x !== id),
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
     );
+  }
+
+  protected filtrosCategoriaActivos(): number {
+    return this.categoriasSeleccionadas().length + (this.categoriaRaizSeleccionada() ? 1 : 0);
+  }
+
+  protected filtrosCarpetaActivos(): number {
+    return this.carpetasSeleccionadas().length + (this.carpetaRaizSeleccionada() ? 1 : 0);
+  }
+
+  protected toggleCategoriaRaiz(): void {
+    this.categoriaRaizSeleccionada.update((v) => !v);
+  }
+
+  protected toggleCarpetaRaiz(): void {
+    this.carpetaRaizSeleccionada.update((v) => !v);
   }
 
   protected limpiarCategorias(): void {
     this.categoriasSeleccionadas.set([]);
+    this.categoriaRaizSeleccionada.set(false);
   }
 
   protected limpiarCarpetas(): void {
     this.carpetasSeleccionadas.set([]);
+    this.carpetaRaizSeleccionada.set(false);
   }
 
   protected cargar(): void {
+    if (!this.rangoValido()) {
+      return;
+    }
     this.loading.set(true);
     this.errorMsg.set(null);
     this.api
@@ -898,6 +1450,8 @@ export class EstadisticasComponent implements OnInit {
         this.hastaStr(),
         this.categoriasSeleccionadas(),
         this.carpetasSeleccionadas(),
+        this.categoriaRaizSeleccionada(),
+        this.carpetaRaizSeleccionada(),
       )
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -933,5 +1487,43 @@ export class EstadisticasComponent implements OnInit {
 
   protected balanceNeto(d: InventarioEstadisticasDto): number {
     return d.unidadesEntrada - d.unidadesSalida;
+  }
+
+  protected valorNum(v: number | null | undefined): number {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  protected valorMovimientoTotal(d: InventarioEstadisticasDto): number {
+    return this.valorNum(d.valorEntrada) + this.valorNum(d.valorSalida) + this.valorNum(d.valorAjuste);
+  }
+
+  protected pctValor(valor: number | null | undefined, d: InventarioEstadisticasDto): number {
+    const total = this.valorMovimientoTotal(d);
+    if (total <= 0) {
+      return 0;
+    }
+    return Math.round((this.valorNum(valor) / total) * 100);
+  }
+
+  protected pieConicGradient(d: InventarioEstadisticasDto): string {
+    const total = this.valorMovimientoTotal(d);
+    if (total <= 0) {
+      return 'conic-gradient(#e2e8f0 0deg 360deg)';
+    }
+    const e = (this.valorNum(d.valorEntrada) / total) * 360;
+    const s = (this.valorNum(d.valorSalida) / total) * 360;
+    const degEntrada = e;
+    const degSalida = e + s;
+    return `conic-gradient(
+      #16a34a 0deg ${degEntrada}deg,
+      #f59e0b ${degEntrada}deg ${degSalida}deg,
+      #7c3aed ${degSalida}deg 360deg
+    )`;
+  }
+
+  protected pieAriaLabel(d: InventarioEstadisticasDto): string {
+    const currency = this.companyCurrency();
+    return `Entradas ${this.pctValor(d.valorEntrada, d)} por ciento, salidas ${this.pctValor(d.valorSalida, d)} por ciento, ajustes ${this.pctValor(d.valorAjuste, d)} por ciento. Total en ${currency}.`;
   }
 }

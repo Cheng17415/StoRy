@@ -53,7 +53,7 @@ import { GoogleSignInButtonComponent } from './google-sign-in-button.component';
         <div class="brand-mini">
           <div class="mini-header">
             <div class="mini-dots"><span></span><span></span><span></span></div>
-            <div class="mini-title">Movimientos · hoy</div>
+            <div class="mini-title">Movimientos hoy</div>
           </div>
           <div class="mini-chart">
             <div class="bar" style="--h: 30%"></div>

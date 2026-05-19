@@ -57,7 +57,7 @@ import { RouterLink } from '@angular/router';
               <div class="mock-dots">
                 <span></span><span></span><span></span>
               </div>
-              <div class="mock-title">StoRy · Inventario</div>
+              <div class="mock-title">StoRy</div>
             </div>
 
             <div class="mock-body">
