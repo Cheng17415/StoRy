@@ -12,7 +12,6 @@ Hola. Este documento resume cómo está montado **StoRy** a nivel de base de dat
 | **Backend** | Spring Boot 3.5 (Java 17) | API REST, seguridad, lógica de negocio |
 | **Base de datos** | PostgreSQL en **Supabase** | Datos persistentes (usuarios, productos, empresas…) |
 | **ORM** | Spring Data JPA / Hibernate | Mapear tablas ↔ clases Java |
-| **Migraciones** | Flyway | Versionar el esquema SQL (`V1`…`V13`) |
 | **Almacenamiento** | Supabase Storage | Imágenes de productos (bucket público `imagenes`) |
 | **Auth** | JWT (JSON Web Token) | Sesión stateless tras login/registro |
 | **Contraseñas** | BCrypt | Hashear passwords locales |
@@ -33,31 +32,31 @@ La app es **multi-empresa**: casi todo el inventario cuelga de una `company`. Un
 
 ```mermaid
 erDiagram
-    USUARIO ||--o{ COMPANY_MEMBER : pertenece
-    COMPANY ||--o{ COMPANY_MEMBER : miembros
-    USUARIO ||--o{ MOVIMIENTO_STOCK : registra
-    USUARIO ||--o{ COMPANY_INVITATION : invita
-    USUARIO ||--o{ PRODUCTO : propietario
+    usuario ||--o{ miembro_empresa : pertenece
+    empresa ||--o{ miembro_empresa : miembros
+    usuario ||--o{ movimiento_stock : registra
+    usuario ||--o{ invitacion_empresa : invita
+    usuario ||--o{ producto : propietario
 
-    COMPANY ||--o{ COMPANY_INVITATION : invitaciones
-    COMPANY ||--o{ PRODUCTO : catalogo
-    COMPANY ||--o{ PRODUCTO_CARPETA : carpetas
-    COMPANY ||--o{ CATEGORIA : categorias
+    empresa ||--o{ invitacion_empresa : invitaciones
+    empresa ||--o{ producto : catalogo
+    empresa ||--o{ producto_carpeta : carpetas
+    empresa ||--o{ categoria : categorias
 
-    CATEGORIA ||--o{ PRODUCTO_CATEGORIA : etiqueta
-    PRODUCTO ||--o{ PRODUCTO_CATEGORIA : tiene
+    categoria ||--o{ producto_categoria : etiqueta
+    producto ||--o{ producto_categoria : tiene
 
-    PRODUCTO_CARPETA ||--o{ PRODUCTO_CARPETA : padre_hijo
-    PRODUCTO_CARPETA ||--o{ PRODUCTO : contiene
+    producto_carpeta ||--o{ producto_carpeta : padre_hijo
+    producto_carpeta ||--o{ producto : contiene
 
-    PRODUCTO ||--o{ MOVIMIENTO_STOCK : historial
+    producto ||--o{ movimiento_stock : historial
 
-    PRODUCTO_CATEGORIA {
+    producto_categoria {
         bigint producto_id PK,FK
         bigint categoria_id PK,FK
     }
 
-    USUARIO {
+    usuario {
         bigint id PK
         string name
         string email UK
@@ -71,7 +70,7 @@ erDiagram
         timestamptz fecha_ultimo_login
     }
 
-    COMPANY {
+    empresa {
         bigint id PK
         string name UK
         string password_hash
@@ -80,14 +79,14 @@ erDiagram
         bigint created_by_user_id FK
     }
 
-    COMPANY_MEMBER {
+    miembro_empresa {
         bigint company_id PK,FK
         bigint user_id PK,FK,UK
         string role
         timestamptz joined_at
     }
 
-    COMPANY_INVITATION {
+    invitacion_empresa {
         bigint id PK
         bigint company_id FK
         string email
@@ -101,14 +100,14 @@ erDiagram
         timestamptz created_at
     }
 
-    CATEGORIA {
+    categoria {
         bigint id PK
         bigint company_id FK
         string nombre
         text descripcion
     }
 
-    PRODUCTO {
+    producto {
         bigint id PK
         string nombre
         text descripcion
@@ -117,23 +116,25 @@ erDiagram
         int cantidad
         int stock_minimo
         boolean activo
-        timestamptz fechas
+        timestamptz fecha_creacion
+        timestamptz fecha_actualizacion
         string imagen
         bigint usuario_id FK
         bigint company_id FK
         bigint carpeta_id FK
     }
 
-    PRODUCTO_CARPETA {
+    producto_carpeta {
         bigint id PK
         bigint company_id FK
         bigint parent_id FK
         string nombre
         text descripcion
-        timestamptz fechas
+        timestamptz fecha_creacion
+        timestamptz fecha_actualizacion
     }
 
-    MOVIMIENTO_STOCK {
+    movimiento_stock {
         bigint id PK
         bigint producto_id FK
         string tipo
@@ -144,7 +145,7 @@ erDiagram
     }
 ```
 
-> **Nota:** los roles de la app van por **empresa** (`company_member.role`: `company_admin`, `employee`, `analytics_viewer`), no por tablas de perfil genérico.
+> **Nota:** en PostgreSQL las tablas de empresa se llaman `company`, `company_member` e `company_invitation` (nombres en inglés en el esquema). Los roles van por `company_member.role`: `company_admin`, `employee`, `analytics_viewer`.
 
 ### 2.2 Qué hace cada tabla (en cristiano)
 
@@ -156,8 +157,8 @@ erDiagram
 | **company_invitation** | Invitación por email con token, rol asignado y caducidad (7 días). |
 | **categoria** | Etiquetas opcionales para productos, **por empresa**. El nombre es único dentro de la misma empresa (`company_id` + `nombre`). |
 | **producto** | Artículo de inventario. Código único **por empresa** (`company_id` + `codigo`). Imagen = URL pública en Supabase Storage. Puede tener **varias categorías** vía `producto_categoria`. |
-| **producto_categoria** | Tabla N:M entre producto y categoría (desde `V11`; sustituye la antigua columna `producto.categoria_id`). |
-| **producto_carpeta** | Carpetas tipo árbol dentro de una empresa (pueden anidarse con `parent_id`). Sin imagen propia desde `V13`. |
+| **producto_categoria** | Tabla N:M entre producto y categoría (un producto puede tener varias etiquetas). |
+| **producto_carpeta** | Carpetas tipo árbol dentro de una empresa (pueden anidarse con `parent_id`; sin columna de imagen). |
 | **movimiento_stock** | Historial: cada entrada, salida o ajuste de stock, con usuario y fecha. |
 
 ### 2.3 Reglas importantes de integridad
@@ -171,7 +172,7 @@ erDiagram
 
 ---
 
-## 3. Roles de empresa (lo que importa de verdad)
+## 3. Roles de empresa
 
 En el día a día usamos **`CompanyRole`** (tabla `company_member`):
 
@@ -357,14 +358,7 @@ flowchart TD
 
 Las categorías son **etiquetas opcionales** por empresa. Un producto puede tener **cero o varias** categorías (`producto_categoria`).
 
-**Migraciones relevantes:**
-
-| Versión | Cambio |
-|---------|--------|
-| `V10` | `categoria.company_id`, unicidad `(company_id, nombre)` |
-| `V11` | Tabla `producto_categoria`; se elimina `producto.categoria_id` |
-| `V12` | Bucket Supabase Storage `imagenes` (JPEG/PNG/GIF/WebP, máx. 5 MB) |
-| `V13` | Elimina `producto_carpeta.imagen` (imágenes solo en productos) |
+**Esquema en Supabase (resumen):** categorías por empresa (`categoria.company_id`); relación N:M `producto_categoria`; imágenes de producto en bucket Storage `imagenes` (JPEG/PNG/GIF/WebP, máx. 5 MB). Los cambios de esquema se aplican en el proyecto Supabase, no desde este repositorio.
 
 **API de catálogo (JWT + empresa; escritura según rol):**
 
@@ -424,13 +418,12 @@ sequenceDiagram
 
 | Tema | Ubicación |
 |------|-----------|
-| Migraciones SQL | `backend/src/main/resources/db/migration/` |
 | Entidades JPA | `backend/src/main/java/com/story/model/` |
 | Auth | `AuthService`, `AuthController` |
 | Empresa e invitaciones | `CompanyService`, `CompanyController` |
 | Productos y permisos | `CatalogoService`, `ProductoController` |
 | Categorías N:M | `CategoriaController`, `CatalogoService.agregarProductoCategoria`, `quitarProductoCategoria` |
-| Imágenes Storage | `FileStorageService`, `SupabaseProperties`, migración `V12` |
+| Imágenes Storage | `FileStorageService`, `SupabaseProperties` |
 | Carpetas | `CarpetaService`, `CarpetaController` |
 | Estadísticas | `InventarioService.estadisticas`, `ProductoController` (`categoriaIds`, `carpetaIds`, raíz) |
 | Empresa y roles | `CompanyService.updateMemberRole`, `CompanyController` |
@@ -447,7 +440,7 @@ sequenceDiagram
 - La base **no está en Docker local**: está en un proyecto Supabase.
 - El backend se conecta con el **Session pooler** (IPv4), variables `SPRING_DATASOURCE_*` en `.env`.
 - **RLS** está activado en las tablas: si alguien usara la API REST de Supabase con la clave `anon`, no vería filas sin políticas. Nuestro backend usa el rol `postgres` por JDBC y no depende de esas políticas.
-- El esquema lo llevamos con **Flyway** (`V1`…`V13`). Hitos: `V5` multi-empresa; `V9` elimina tablas `perfil`; `V10` categorías por empresa; `V11` N:M producto–categoría; `V12` bucket `imagenes`; `V13` sin imagen en carpetas.
+- El **esquema PostgreSQL** se mantiene en Supabase (este repo no incluye scripts de migración). Hibernate valida el modelo al arrancar (`ddl-auto: validate`).
 - Variables en `.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SPRING_DATASOURCE_*`, `GOOGLE_CLIENT_ID`, `RESEND_*` (ver `.env.example`).
 
 ---
