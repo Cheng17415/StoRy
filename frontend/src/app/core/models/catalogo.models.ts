@@ -80,6 +80,10 @@ export interface InventarioEstadisticasDto {
   unidadesEntrada: number;
   unidadesSalida: number;
   unidadesAjuste: number;
+  totalProductos: number;
+  productosBajoMinimo: number;
+  cantidadActualTotal: number;
+  valorInventarioTotal: number;
   seriePorDia: SerieDiaMovimientoDto[];
   topSalidasProducto: ProductoSalidaResumenDto[];
 }
