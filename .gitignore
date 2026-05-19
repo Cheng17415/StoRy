@@ -24,7 +24,7 @@ application-local.yml
 **/application-local.yml
 .env
 
-.cursor/
+.cursor
 .agents/
 .mcp.json
 skills-lock.json
