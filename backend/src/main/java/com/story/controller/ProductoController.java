@@ -1,6 +1,7 @@
 package com.story.controller;
 
 import com.story.model.AgregarProductoCategoriaRequest;
+import com.story.model.ActualizarStockMinimoRequest;
 import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.MoverProductoCarpetaRequest;
@@ -144,6 +145,14 @@ public class ProductoController {
     @PatchMapping("/{id}/carpeta")
     public ProductoResponse moverCarpeta(@PathVariable Long id, @RequestBody MoverProductoCarpetaRequest body) {
         return catalogoService.moverProductoCarpeta(id, body.carpetaId());
+    }
+
+    @PatchMapping("/{id}/stock-minimo")
+    public ProductoResponse actualizarStockMinimo(
+            @PathVariable Long id,
+            @RequestBody ActualizarStockMinimoRequest body
+    ) {
+        return catalogoService.actualizarStockMinimo(id, body.stockMinimo());
     }
 
     @PostMapping("/{id}/categorias")
