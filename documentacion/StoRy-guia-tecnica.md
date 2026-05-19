@@ -12,12 +12,13 @@ Hola. Este documento resume cómo está montado **StoRy** a nivel de base de dat
 | **Backend** | Spring Boot 3.5 (Java 17) | API REST, seguridad, lógica de negocio |
 | **Base de datos** | PostgreSQL en **Supabase** | Datos persistentes (usuarios, productos, empresas…) |
 | **ORM** | Spring Data JPA / Hibernate | Mapear tablas ↔ clases Java |
-| **Migraciones** | Flyway | Versionar el esquema SQL (`V1`…`V10`) |
+| **Migraciones** | Flyway | Versionar el esquema SQL (`V1`…`V13`) |
+| **Almacenamiento** | Supabase Storage | Imágenes de productos (bucket público `imagenes`) |
 | **Auth** | JWT (JSON Web Token) | Sesión stateless tras login/registro |
 | **Contraseñas** | BCrypt | Hashear passwords locales |
 | **Google** | Google Identity (ID token) | Login/registro con cuenta Google |
 | **Emails** | Resend | Invitaciones a empresa |
-| **Tests backend** | H2 en memoria | Tests sin tocar Supabase |
+| **Tests backend** | H2 en memoria | Tests sin tocar Supabase (10 clases de test en `backend/src/test`) |
 | **Build** | Maven (`mvnw`) + npm | Backend y frontend por separado |
 
 **Arquitectura resumida:** el navegador (Angular en `localhost:4200`) habla con el backend (Spring en `localhost:8080`) mediante un **proxy** en desarrollo. El backend es quien se conecta a Postgres en Supabase con las credenciales del `.env`.
@@ -43,12 +44,18 @@ erDiagram
     COMPANY ||--o{ PRODUCTO_CARPETA : carpetas
     COMPANY ||--o{ CATEGORIA : categorias
 
-    CATEGORIA ||--o{ PRODUCTO : clasifica
+    CATEGORIA ||--o{ PRODUCTO_CATEGORIA : etiqueta
+    PRODUCTO ||--o{ PRODUCTO_CATEGORIA : tiene
 
     PRODUCTO_CARPETA ||--o{ PRODUCTO_CARPETA : padre_hijo
     PRODUCTO_CARPETA ||--o{ PRODUCTO : contiene
 
     PRODUCTO ||--o{ MOVIMIENTO_STOCK : historial
+
+    PRODUCTO_CATEGORIA {
+        bigint producto_id PK,FK
+        bigint categoria_id PK,FK
+    }
 
     USUARIO {
         bigint id PK
@@ -112,7 +119,6 @@ erDiagram
         boolean activo
         timestamptz fechas
         string imagen
-        bigint categoria_id FK
         bigint usuario_id FK
         bigint company_id FK
         bigint carpeta_id FK
@@ -124,7 +130,6 @@ erDiagram
         bigint parent_id FK
         string nombre
         text descripcion
-        string imagen
         timestamptz fechas
     }
 
@@ -150,8 +155,9 @@ erDiagram
 | **company_member** | Quién está en qué empresa y con qué **rol**. Un usuario = una fila como máximo. |
 | **company_invitation** | Invitación por email con token, rol asignado y caducidad (7 días). |
 | **categoria** | Etiquetas opcionales para productos, **por empresa**. El nombre es único dentro de la misma empresa (`company_id` + `nombre`). |
-| **producto** | Artículo de inventario. Código único **por empresa** (`company_id` + `codigo`). Pertenece a un usuario creador y a una empresa. |
-| **producto_carpeta** | Carpetas tipo árbol dentro de una empresa (pueden anidarse con `parent_id`). |
+| **producto** | Artículo de inventario. Código único **por empresa** (`company_id` + `codigo`). Imagen = URL pública en Supabase Storage. Puede tener **varias categorías** vía `producto_categoria`. |
+| **producto_categoria** | Tabla N:M entre producto y categoría (desde `V11`; sustituye la antigua columna `producto.categoria_id`). |
+| **producto_carpeta** | Carpetas tipo árbol dentro de una empresa (pueden anidarse con `parent_id`). Sin imagen propia desde `V13`. |
 | **movimiento_stock** | Historial: cada entrada, salida o ajuste de stock, con usuario y fecha. |
 
 ### 2.3 Reglas importantes de integridad
@@ -159,7 +165,7 @@ erDiagram
 - Si borras una **empresa**, en cascada se van miembros, invitaciones, carpetas y **categorías**.
 - Un **producto** no puede quedarse huérfano de empresa (`company_id` obligatorio).
 - El **código** de producto es único dentro de la misma empresa, no en todo el mundo.
-- Una **categoría** pertenece a una sola empresa; un producto solo puede tener categorías de su misma empresa (`categoria_id` opcional, `NULL` = sin categoría).
+- Una **categoría** pertenece a una sola empresa; las etiquetas de un producto se gestionan en `producto_categoria` (cero o más filas por producto).
 - **movimiento_stock** se borra si se borra el producto (`ON DELETE CASCADE`).
 - Una carpeta con productos dentro no se borra a la ligera (`carpeta_id` en producto con `RESTRICT`); el admin borra la carpeta y la app elimina productos del subárbol.
 
@@ -182,7 +188,7 @@ flowchart TB
     subgraph admin["company_admin"]
         A1["Crear, editar y borrar productos"]
         A2["Gestionar carpetas"]
-        A3["Invitar miembros"]
+        A3["Invitar miembros y cambiar roles"]
         A4["Estadisticas"]
         A5["Movimientos de stock"]
         A6["Crear categorias y asignarlas a productos"]
@@ -217,6 +223,7 @@ flowchart LR
 - **Crear empresa:** el usuario pasa a ser `company_admin` y sus productos “sueltos” se migran a esa empresa.
 - **Unirse:** nombre de empresa + contraseña de empresa → entra como `employee`.
 - **Invitación:** el admin manda email (Resend); el invitado acepta con el token → rol el que puso el admin.
+- **Cambio de rol:** `PATCH /api/company/members/{userId}/role` (solo `company_admin`).
 
 ---
 
@@ -346,31 +353,56 @@ flowchart TD
 - Al **editar** cantidad, se registran entradas/salidas/ajustes según la diferencia.
 - Tipos de movimiento: `ENTRADA`, `SALIDA`, `AJUSTE`.
 
-### 5.1 Categorías y productos
+### 5.1 Categorías y productos (N:M)
 
-Las categorías son **etiquetas opcionales** por empresa. Un producto puede tener **cero o una** categoría (`producto.categoria_id`).
+Las categorías son **etiquetas opcionales** por empresa. Un producto puede tener **cero o varias** categorías (`producto_categoria`).
 
-**Migración:** `V10__categoria_company.sql` añade `company_id` a `categoria`, índice por empresa y unicidad `(company_id, nombre)`. Las categorías globales anteriores a multi-tenant se eliminaron en esa migración.
+**Migraciones relevantes:**
 
-**API (requieren JWT):**
+| Versión | Cambio |
+|---------|--------|
+| `V10` | `categoria.company_id`, unicidad `(company_id, nombre)` |
+| `V11` | Tabla `producto_categoria`; se elimina `producto.categoria_id` |
+| `V12` | Bucket Supabase Storage `imagenes` (JPEG/PNG/GIF/WebP, máx. 5 MB) |
+| `V13` | Elimina `producto_carpeta.imagen` (imágenes solo en productos) |
 
-| Método | Ruta | Quién | Qué hace |
-|--------|------|-------|----------|
-| `GET` | `/api/categorias` | autenticado | Lista categorías de la empresa actual |
-| `POST` | `/api/categorias` | `employee`+ | Crea categoría (`nombre`, `descripcion` opcional). Duplicado → `409` |
-| `PATCH` | `/api/productos/{id}/categoria` | `employee`+ | Asigna o quita categoría (`{ "categoriaId": number \| null }`) |
-| `GET` | `/api/productos?carpetaId=&categoriaId=` | autenticado | Lista productos filtrados por carpeta y/o categoría |
-| `GET` | `/api/productos/bajo-minimo?categoriaId=` | autenticado | Stock bajo mínimo, filtro opcional por categoría |
-| `GET` | `/api/productos/estadisticas?desde=&hasta=&categoriaId=` | admin o analítica | KPIs y series solo de movimientos de productos de esa categoría |
+**API de catálogo (JWT + empresa; escritura según rol):**
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| `GET` | `/api/categorias` | Lista categorías de la empresa |
+| `POST` | `/api/categorias` | Crea categoría (`employee`+) |
+| `GET` | `/api/productos?carpetaId=&categoriaId=&bajoMinimo=` | Lista por carpeta/categoría o bajo mínimo |
+| `GET` | `/api/productos/todos` | Catálogo completo de la empresa |
+| `GET` | `/api/productos/bajo-minimo` | Alias legacy de bajo mínimo |
+| `POST` | `/api/productos/{id}/categorias` | Añade categoría (`categoriaId` o `nombre` nuevo) |
+| `DELETE` | `/api/productos/{id}/categorias/{categoriaId}` | Quita una etiqueta |
+| `PATCH` | `/api/productos/{id}/stock-minimo` | Actualiza umbral de alerta |
+| `POST` / `POST .../update` | multipart | Crear/actualizar producto con imagen opcional |
+
+**API de estadísticas** (`GET /api/productos/estadisticas`, `company_admin` o `analytics_viewer`):
+
+| Parámetro | Uso |
+|-----------|-----|
+| `desde`, `hasta` | Rango de fechas (obligatorio) |
+| `categoriaIds` | Lista de IDs de categoría (varios) |
+| `carpetaIds` | Lista de IDs de carpeta |
+| `categoriaRaiz=true` | Solo productos **sin** ninguna categoría |
+| `carpetaRaiz=true` | Solo productos **sin** carpeta (raíz del catálogo) |
+| `categoriaId` | Compatibilidad: un solo ID (legacy) |
+
+Respuesta: totales de movimientos, unidades y valor por tipo, productos bajo mínimo, serie diaria y top de salidas (`InventarioEstadisticasResponse`).
 
 **Frontend:**
 
 | Ruta | Comportamiento |
 |------|----------------|
-| `/producto/:id` | Sección **Categoría**: selector, crear inline, quitar. Cambios inmediatos vía `PATCH` (no dependen del modo editar del resto de campos). |
-| `/productos` | `<select>` de categoría en la barra de herramientas; recarga el listado con `categoriaId`. |
-| `/estadisticas` | Filtro de categoría junto al rango de fechas. |
-| `/categorias` | Listado de consulta (requiere login). |
+| `/producto/:id` | Ficha: edición según rol, categorías múltiples, movimientos, imagen |
+| `/productos` | Árbol de carpetas, filtros, resumen de stock, CRUD según rol |
+| `/stock-bajo` | Listado de alertas de stock mínimo |
+| `/estadisticas` | KPIs, gráficos y filtros múltiples de categoría/carpeta |
+| `/categorias` | Consulta de categorías |
+| `/empresa` | Miembros, invitaciones y cambio de roles (admin) |
 
 ```mermaid
 sequenceDiagram
@@ -379,15 +411,12 @@ sequenceDiagram
     participant BE as CatalogoService
     participant DB as Postgres
 
-    UI->>API: createCategoria("Alimentacion")
-    API->>BE: POST /api/categorias
-    BE->>DB: INSERT categoria(company_id, nombre)
-    UI->>API: asignarProductoCategoria(id, catId)
-    API->>BE: PATCH /api/productos/id/categoria
-    BE->>DB: UPDATE producto SET categoria_id
+    UI->>API: agregarCategoria(productoId, categoriaId)
+    API->>BE: POST /api/productos/id/categorias
+    BE->>DB: INSERT producto_categoria
 ```
 
-**Fuera de alcance actual:** editar/eliminar categorías desde UI o API; filtro por categoría en `GET /api/productos/todos`.
+**Fuera de alcance actual:** editar/eliminar categorías desde UI o API dedicada.
 
 ---
 
@@ -400,14 +429,16 @@ sequenceDiagram
 | Auth | `AuthService`, `AuthController` |
 | Empresa e invitaciones | `CompanyService`, `CompanyController` |
 | Productos y permisos | `CatalogoService`, `ProductoController` |
-| Categorías | `CategoriaController`, `CatalogoService.crearCategoria`, `CatalogoService.asignarProductoCategoria` |
+| Categorías N:M | `CategoriaController`, `CatalogoService.agregarProductoCategoria`, `quitarProductoCategoria` |
+| Imágenes Storage | `FileStorageService`, `SupabaseProperties`, migración `V12` |
 | Carpetas | `CarpetaService`, `CarpetaController` |
-| Estadísticas de inventario | `InventarioService.estadisticas`, filtro opcional `categoriaId` |
+| Estadísticas | `InventarioService.estadisticas`, `ProductoController` (`categoriaIds`, `carpetaIds`, raíz) |
+| Empresa y roles | `CompanyService.updateMemberRole`, `CompanyController` |
 | Usuario actual y roles | `CurrentUserService` |
 | Rutas Angular | `frontend/src/app/app.routes.ts` |
 | Guards | `frontend/src/app/core/guards/auth.guard.ts` |
-| API catálogo (frontend) | `frontend/src/app/core/services/catalogo-api.service.ts` |
-| Ficha producto / filtros | `producto-detalle.component.ts`, `productos.component.ts`, `estadisticas.component.ts` |
+| API catálogo (frontend) | `catalogo-api.service.ts`, `company-api.service.ts` |
+| Pantallas | `productos`, `producto-detalle`, `estadisticas`, `stock-bajo-minimo`, `company`, `home` |
 
 ---
 
@@ -416,6 +447,7 @@ sequenceDiagram
 - La base **no está en Docker local**: está en un proyecto Supabase.
 - El backend se conecta con el **Session pooler** (IPv4), variables `SPRING_DATASOURCE_*` en `.env`.
 - **RLS** está activado en las tablas: si alguien usara la API REST de Supabase con la clave `anon`, no vería filas sin políticas. Nuestro backend usa el rol `postgres` por JDBC y no depende de esas políticas.
-- El esquema lo llevamos con **Flyway** (`V1`…`V10`). La migración `V9__drop_perfil_usuario_perfil.sql` eliminó las tablas `perfil` y `usuario_perfil` (sin uso; los roles van por `company_member`). La migración `V10__categoria_company.sql` hace las categorías multi-tenant (`company_id` en `categoria`).
+- El esquema lo llevamos con **Flyway** (`V1`…`V13`). Hitos: `V5` multi-empresa; `V9` elimina tablas `perfil`; `V10` categorías por empresa; `V11` N:M producto–categoría; `V12` bucket `imagenes`; `V13` sin imagen en carpetas.
+- Variables en `.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SPRING_DATASOURCE_*`, `GOOGLE_CLIENT_ID`, `RESEND_*` (ver `.env.example`).
 
 ---

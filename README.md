@@ -1,8 +1,18 @@
 # StoRy
 
-Proyecto DAM: inventario tipo BOM. Incluye **backend** (Spring Boot) y **frontend** (Angular).
+Proyecto intermodular **2º DAM**: aplicación web de **inventario multi-empresa** (catálogo en carpetas, categorías, movimientos de stock, estadísticas y alertas de stock bajo mínimo). Incluye **backend** (Spring Boot) y **frontend** (Angular).
 
-La base de datos es **PostgreSQL en Supabase** (no hay Postgres local en el repositorio).
+La base de datos es **PostgreSQL en Supabase** (no hay Postgres local en el repositorio). Documentación ampliada: [documentacion/StoRy-guia-tecnica.md](documentacion/StoRy-guia-tecnica.md) y memoria del proyecto en [documentacion/StoRy-proyecto-DAM.docx](documentacion/StoRy-proyecto-DAM.docx).
+
+## Funcionalidades principales
+
+| Área | Qué incluye |
+|------|-------------|
+| **Auth** | Registro e inicio de sesión local (JWT), login con Google, perfil y vinculación de cuenta Google |
+| **Empresa** | Crear/unirse/salir, invitaciones por email (Resend), roles por miembro (`company_admin`, `employee`, `analytics_viewer`), cambio de rol por el admin |
+| **Catálogo** | Productos en árbol de carpetas, varias categorías por producto, imágenes en Supabase Storage, clonado, filtros por carpeta/categoría |
+| **Stock** | Movimientos (entrada/salida/ajuste), stock mínimo, pantalla de productos bajo mínimo |
+| **Analítica** | Estadísticas de inventario por periodo con filtros múltiples (categorías, carpetas, raíz sin categoría/carpeta) |
 
 ## Inicio rápido (scripts)
 
@@ -35,7 +45,7 @@ SPRING_DATASOURCE_PASSWORD=<contraseña Database>
 
 **Nota:** el host directo `db.<ref>.supabase.co` suele ser solo IPv6; en Windows/red sin IPv6 usa el **Session pooler** del dashboard (p. ej. `aws-1-<region>.pooler.supabase.com`).
 
-**Flyway:** en el primer arranque contra una base vacía aplica `backend/src/main/resources/db/migration/`. Si el esquema ya existe sin `flyway_schema_history`, el perfil `dev` hace baseline en la versión 8.
+**Flyway:** en el primer arranque contra una base vacía aplica `backend/src/main/resources/db/migration/` (`V1`…`V13`). Hitos recientes: `V11` categorías N:M con productos, `V12` bucket Storage `imagenes`, `V13` elimina columna `imagen` de carpetas (solo productos guardan URL). Si el esquema ya existe sin `flyway_schema_history`, el perfil `dev` hace baseline en la versión 8.
 
 ### Ejecutar la API
 
@@ -65,11 +75,13 @@ La API guarda en base de datos la URL pública, por ejemplo:
 
 Las rutas antiguas `/api/files/...` siguen sirviéndose desde disco local si aún existen ficheros en `~/.story/uploads`.
 
-### Endpoints de ejemplo
+### Endpoints de ejemplo (requieren JWT salvo auth y health)
 
-- `GET http://localhost:8080/api/categorias`
-- `GET http://localhost:8080/api/productos`
-- `GET http://localhost:8080/actuator/health`
+- `POST http://localhost:8080/api/auth/login` · `POST /api/auth/register` · `POST /api/auth/google`
+- `GET http://localhost:8080/api/company/me` · `PATCH /api/company/members/{userId}/role`
+- `GET http://localhost:8080/api/productos?carpetaId=&categoriaId=` · `GET /api/productos/todos`
+- `GET http://localhost:8080/api/productos/estadisticas?desde=&hasta=&categoriaIds=&carpetaIds=&categoriaRaiz=&carpetaRaiz=`
+- `GET http://localhost:8080/api/carpetas/arbol` · `GET http://localhost:8080/actuator/health`
 
 ### Tests
 
@@ -89,17 +101,22 @@ Estructura principal (`src/app/`):
 
 ```text
 app/
-├── core/                 # Servicios y modelos reutilizables
-│   ├── models/           # DTOs / interfaces (p. ej. catalogo.models.ts)
-│   └── services/         # p. ej. CatalogoApiService (llamadas HTTP a /api)
-├── shared/               # Componentes, directivas y pipes compartidos
-├── features/             # Pantallas por dominio
-│   ├── home/
-│   └── catalogo/         # Categorías y productos (ejemplo con lazy loading)
-├── app.config.ts
+├── core/
+│   ├── guards/           # authGuard, companyGuard, estadisticasGuard, landingGuard
+│   ├── models/
+│   └── services/         # auth, catalogo, company
+├── features/
+│   ├── auth/             # login, register
+│   ├── home/             # landing pública / panel según sesión
+│   ├── catalogo/         # productos, detalle, categorías, stock bajo mínimo
+│   ├── inventario/       # estadísticas
+│   ├── company/          # gestión de empresa e invitaciones
+│   └── perfil/
 ├── app.routes.ts
 └── app.component.*
 ```
+
+Rutas (`app.routes.ts`): `/`, `/login`, `/register`, `/productos`, `/producto/:id`, `/categorias`, `/stock-bajo`, `/estadisticas` (admin o analítica), `/empresa`, `/perfil`.
 
 Arranque: `.\scripts\start-frontend.ps1` o `cd frontend && npm run start`. La app usa rutas perezosas y `provideHttpClient()` para consumir el API a través del proxy de desarrollo.
 
