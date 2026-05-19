@@ -5,7 +5,7 @@ import { catchError, forkJoin, of, switchMap } from 'rxjs';
 import { AccountApiService } from '../../core/services/account-api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { CompanyApiService } from '../../core/services/company-api.service';
-import { CompanyPageDto, CompanyRole } from '../../core/models/company.models';
+import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models/company.models';
 
 @Component({
   selector: 'app-company',
@@ -196,13 +196,27 @@ import { CompanyPageDto, CompanyRole } from '../../core/models/company.models';
                     <span class="member-avatar" aria-hidden="true">{{ m.name.slice(0, 1).toUpperCase() }}</span>
                     <span class="member-main">
                       <span class="member-name">{{ m.name }}</span>
-                      @if (m.role === 'company_admin') {
-                        <span class="meta">(Propietario)</span>
-                      }
                       @if (m.email === currentEmail()) {
                         <span class="meta-you">(Tú)</span>
                       }
                     </span>
+                    @if (page.company.role === 'company_admin') {
+                      <label class="member-role-select">
+                        <span class="sr-only">Rol de {{ m.name }}</span>
+                        <select
+                          [value]="m.role"
+                          [disabled]="updatingMemberRoleUserId() === m.userId || loading() || isSoleOwner(m, page.members)"
+                          [title]="isSoleOwner(m, page.members) ? 'Debe haber al menos un propietario' : null"
+                          (change)="changeMemberRole(m, page.members, $any($event.target).value)"
+                        >
+                          <option value="employee">{{ roleLabel('employee') }}</option>
+                          <option value="analytics_viewer">{{ roleLabel('analytics_viewer') }}</option>
+                          <option value="company_admin">{{ roleLabel('company_admin') }}</option>
+                        </select>
+                      </label>
+                    } @else {
+                      <span class="member-role-readonly">{{ roleLabel(m.role) }}</span>
+                    }
                   </li>
                 }
                 @for (i of pendingInvitations(); track i.id) {
@@ -707,6 +721,44 @@ import { CompanyPageDto, CompanyRole } from '../../core/models/company.models';
       font-size: 0.9rem;
     }
 
+    .member-role-select {
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .member-role-select select {
+      min-height: 2rem;
+      padding: 0.35rem 0.55rem;
+      font-size: 0.8rem;
+      min-width: 8.5rem;
+    }
+
+    .member-role-select select:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+      background: #f1f5f9;
+    }
+
+    .member-role-readonly {
+      margin-left: auto;
+      flex-shrink: 0;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--story-text-muted);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     .member-avatar {
       width: 2rem;
       height: 2rem;
@@ -800,6 +852,7 @@ export class CompanyComponent {
   private readonly joinDialogRef = viewChild<ElementRef<HTMLDialogElement>>('joinDialog');
 
   protected readonly loading = signal(false);
+  protected readonly updatingMemberRoleUserId = signal<number | null>(null);
   protected readonly error = signal('');
   protected readonly success = signal('');
   protected readonly companyPage = signal<CompanyPageDto | null>(null);
@@ -828,6 +881,62 @@ export class CompanyComponent {
 
   protected currentEmail(): string {
     return this.auth.currentUser()?.email ?? '';
+  }
+
+  protected roleLabel(role: CompanyRole): string {
+    switch (role) {
+      case 'company_admin':
+        return 'Propietario';
+      case 'analytics_viewer':
+        return 'Analítica';
+      default:
+        return 'Empleado';
+    }
+  }
+
+  protected ownerCount(members: CompanyMemberDto[]): number {
+    return members.filter((m) => m.role === 'company_admin').length;
+  }
+
+  protected isSoleOwner(member: CompanyMemberDto, members: CompanyMemberDto[]): boolean {
+    return member.role === 'company_admin' && this.ownerCount(members) === 1;
+  }
+
+  protected canChangeMemberRole(
+    member: CompanyMemberDto,
+    members: CompanyMemberDto[],
+    role: CompanyRole,
+  ): boolean {
+    if (member.role === role) return false;
+    if (member.role === 'company_admin' && role !== 'company_admin' && this.ownerCount(members) <= 1) {
+      return false;
+    }
+    return true;
+  }
+
+  protected changeMemberRole(
+    member: CompanyMemberDto,
+    members: CompanyMemberDto[],
+    role: CompanyRole,
+  ): void {
+    if (!this.canChangeMemberRole(member, members, role)) return;
+    this.updatingMemberRoleUserId.set(member.userId);
+    this.error.set('');
+    this.success.set('');
+    this.companyApi
+      .updateMemberRole(member.userId, { role })
+      .pipe(switchMap(() => this.refreshUserAndPage()))
+      .subscribe({
+        next: () => {
+          this.updatingMemberRoleUserId.set(null);
+          this.success.set(`Rol de ${member.name} actualizado.`);
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.updatingMemberRoleUserId.set(null);
+          this.error.set(err?.error?.message ?? 'No se pudo cambiar el rol.');
+          this.refreshPage();
+        },
+      });
   }
 
   constructor() {

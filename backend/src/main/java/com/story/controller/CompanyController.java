@@ -8,10 +8,13 @@ import com.story.model.company.CreateCompanyRequest;
 import com.story.model.company.CompanyInvitationDto;
 import com.story.model.company.InviteCompanyMemberRequest;
 import com.story.model.company.JoinCompanyRequest;
+import com.story.model.company.UpdateCompanyMemberRoleRequest;
 import com.story.service.CompanyService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -71,6 +74,14 @@ public class CompanyController {
     @GetMapping("/members")
     public List<CompanyMemberDto> members() {
         return companyService.getCurrentCompanyPage().members();
+    }
+
+    @PatchMapping("/members/{userId}/role")
+    public CompanyMemberDto updateMemberRole(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateCompanyMemberRoleRequest request
+    ) {
+        return companyService.updateMemberRole(userId, request);
     }
 
     @GetMapping("/invitations")

@@ -443,8 +443,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                         }
                       </div>
                       <p class="card-meta">
-                        <span class="card-code">—</span>
-                        <span class="list-cat"> · <span class="folder-meta-label">Carpeta</span></span>
+                        <span class="folder-meta-label">Carpeta</span>
                       </p>
                       <div class="card-footer">
                         <span class="card-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
@@ -584,8 +583,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     <div class="list-main">
                       <h2 class="list-title">{{ d.nombre }}</h2>
                       <p class="list-meta">
-                        <span class="card-code">—</span>
-                        <span class="list-cat"> · <span class="folder-meta-label">Carpeta</span></span>
+                        <span class="folder-meta-label">Carpeta</span>
                       </p>
                     </div>
                     <div class="list-stats">
