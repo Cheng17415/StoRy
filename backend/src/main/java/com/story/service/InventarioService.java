@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -81,14 +82,31 @@ public class InventarioService {
         }
         List<MovimientoStock> rows =
                 movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta, categoriaId);
+        List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
+                .filter(p -> categoriaId == null || p.getCategorias().stream().anyMatch(c -> c.getId().equals(categoriaId)))
+                .toList();
 
         long unidadesEntrada = 0;
         long unidadesSalida = 0;
         long unidadesAjuste = 0;
+        long cantidadActualTotal = 0;
+        long productosBajoMinimo = 0;
+        BigDecimal valorInventarioTotal = BigDecimal.ZERO;
         ZoneOffset utc = ZoneOffset.UTC;
         TreeMap<LocalDate, EnumMap<TipoMovimiento, Long>> porDia = new TreeMap<>();
         Map<Long, Long> salidasPorProducto = new HashMap<>();
         Map<Long, String> nombreProducto = new HashMap<>();
+
+        for (Producto p : productos) {
+            int cantidad = p.getCantidad() != null ? p.getCantidad() : 0;
+            cantidadActualTotal += cantidad;
+            if (Boolean.TRUE.equals(p.getActivo()) && p.getStockMinimo() != null && cantidad <= p.getStockMinimo()) {
+                productosBajoMinimo++;
+            }
+            if (p.getPrecio() != null) {
+                valorInventarioTotal = valorInventarioTotal.add(p.getPrecio().multiply(BigDecimal.valueOf(cantidad)));
+            }
+        }
 
         for (MovimientoStock m : rows) {
             LocalDate dia = m.getFecha().atZone(utc).toLocalDate();
@@ -130,6 +148,10 @@ public class InventarioService {
                 unidadesEntrada,
                 unidadesSalida,
                 unidadesAjuste,
+                productos.size(),
+                productosBajoMinimo,
+                cantidadActualTotal,
+                valorInventarioTotal,
                 serie,
                 topSalidas);
     }
