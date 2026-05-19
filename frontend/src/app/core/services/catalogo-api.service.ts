@@ -158,6 +158,14 @@ export class CatalogoApiService {
     return this.http.get<MovimientoStockDto[]>(`/api/productos/${id}/movimientos`, this.authBearerOpts());
   }
 
+  updateProductoStockMinimo(id: number, stockMinimo: number | null): Observable<ProductoDto> {
+    return this.http.patch<ProductoDto>(
+      `/api/productos/${id}/stock-minimo`,
+      { stockMinimo },
+      this.authBearerOpts(),
+    );
+  }
+
   getInventarioEstadisticas(
     desde: string,
     hasta: string,

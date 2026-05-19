@@ -233,6 +233,21 @@ public class CatalogoService {
     }
 
     @Transactional
+    public ProductoResponse actualizarStockMinimo(Long productoId, Integer stockMinimo) {
+        currentUserService.requireCompanyAdmin();
+        if (stockMinimo != null && stockMinimo < 0) {
+            throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
+        }
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        Producto p = productoRepository.findByIdAndCompany_Id(productoId, companyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        p.setStockMinimo(stockMinimo);
+        p.setFechaActualizacion(Instant.now());
+        productoRepository.save(p);
+        return toResponse(p);
+    }
+
+    @Transactional
     public ProductoResponse agregarProductoCategoria(Long productoId, Long categoriaId, String nombre) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
