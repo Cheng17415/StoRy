@@ -38,7 +38,15 @@ load_dotenv() {
 load_dotenv "$ENV_FILE"
 
 # macOS Homebrew installa OpenJDK 17 como "keg-only" (sin java en PATH). El proyecto usa Java 17 (pom.xml).
-if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]] && ! command -v java >/dev/null 2>&1; then
+# /usr/bin/java existe como stub sin JRE real; comprobar que java -version funcione, no solo command -v.
+java_usable() {
+  command -v java >/dev/null 2>&1 && java -version >/dev/null 2>&1
+}
+if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]] && "${JAVA_HOME}/bin/java" -version >/dev/null 2>&1; then
+  :
+elif java_usable; then
+  :
+else
   for jdk in "/opt/homebrew/opt/openjdk@17" "/usr/local/opt/openjdk@17"; do
     if [[ -x "${jdk}/bin/java" ]]; then
       export JAVA_HOME="$jdk"
@@ -46,6 +54,10 @@ if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]] && ! command -v jav
       break
     fi
   done
+fi
+if ! java_usable; then
+  echo "Error: JDK 17 no encontrado. Instala con: brew install openjdk@17" >&2
+  exit 1
 fi
 
 BACKEND_DIR="$(cd "$SCRIPT_DIR/../backend" && pwd)"
