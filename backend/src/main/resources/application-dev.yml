@@ -7,6 +7,9 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     show-sql: true
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 8
 
 logging:
   level:
