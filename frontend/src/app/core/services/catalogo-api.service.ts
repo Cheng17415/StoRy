@@ -6,6 +6,8 @@ import {
   CarpetaArbolDto,
   CarpetaDto,
   InventarioEstadisticasDto,
+  InventarioResultadosDto,
+  MovimientoPeriodoDto,
   CategoriaDto,
   ClonarCarpetaResponseDto,
   MovimientoStockDto,
@@ -171,17 +173,17 @@ export class CatalogoApiService {
     );
   }
 
-  getInventarioEstadisticas(
+  private estadisticasParams(
     desde: string,
     hasta: string,
     categoriaIds: number[] = [],
     carpetaIds: number[] = [],
     categoriaRaiz = false,
     carpetaRaiz = false,
-  ): Observable<InventarioEstadisticasDto> {
+  ): HttpParams {
     const cat = categoriaIds.filter((id) => id > 0).map(String);
     const carp = carpetaIds.filter((id) => id > 0).map(String);
-    const params = new HttpParams({
+    return new HttpParams({
       fromObject: {
         desde,
         hasta,
@@ -191,8 +193,46 @@ export class CatalogoApiService {
         ...(carpetaRaiz ? { carpetaRaiz: 'true' } : {}),
       },
     });
+  }
+
+  getInventarioEstadisticas(
+    desde: string,
+    hasta: string,
+    categoriaIds: number[] = [],
+    carpetaIds: number[] = [],
+    categoriaRaiz = false,
+    carpetaRaiz = false,
+  ): Observable<InventarioEstadisticasDto> {
     return this.http.get<InventarioEstadisticasDto>('/api/productos/estadisticas', {
-      params,
+      params: this.estadisticasParams(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz),
+      ...this.authBearerOpts(),
+    });
+  }
+
+  getMovimientosPeriodo(
+    desde: string,
+    hasta: string,
+    categoriaIds: number[] = [],
+    carpetaIds: number[] = [],
+    categoriaRaiz = false,
+    carpetaRaiz = false,
+  ): Observable<MovimientoPeriodoDto[]> {
+    return this.http.get<MovimientoPeriodoDto[]>('/api/productos/estadisticas/movimientos', {
+      params: this.estadisticasParams(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz),
+      ...this.authBearerOpts(),
+    });
+  }
+
+  getResultadosPeriodo(
+    desde: string,
+    hasta: string,
+    categoriaIds: number[] = [],
+    carpetaIds: number[] = [],
+    categoriaRaiz = false,
+    carpetaRaiz = false,
+  ): Observable<InventarioResultadosDto> {
+    return this.http.get<InventarioResultadosDto>('/api/productos/estadisticas/resultados', {
+      params: this.estadisticasParams(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz),
       ...this.authBearerOpts(),
     });
   }

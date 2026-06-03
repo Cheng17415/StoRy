@@ -93,6 +93,44 @@ export interface ProductoSalidaResumenDto {
   unidadesSalida: number;
 }
 
+export interface MovimientoPeriodoDto {
+  id: number;
+  tipo: string;
+  cantidad: number;
+  fecha: string;
+  observacion: string | null;
+  usuario: string;
+  productoId: number;
+  productoNombre: string;
+  productoCodigo: string;
+  categorias: string;
+  carpetaNombre: string;
+  valor: number;
+}
+
+export interface ResultadoProductoLineaDto {
+  productoId: number;
+  productoNombre: string;
+  productoCodigo: string;
+  valorEntradas: number;
+  valorSalidas: number;
+  resultado: number;
+  unidadesEntrada: number;
+  unidadesSalida: number;
+}
+
+export interface InventarioResultadosDto {
+  valorEntradas: number;
+  valorSalidas: number;
+  valorAjustes: number;
+  resultadoNeto: number;
+  unidadesEntrada: number;
+  unidadesSalida: number;
+  unidadesAjuste: number;
+  totalMovimientos: number;
+  porProducto: ResultadoProductoLineaDto[];
+}
+
 export interface InventarioEstadisticasDto {
   totalMovimientos: number;
   unidadesEntrada: number;

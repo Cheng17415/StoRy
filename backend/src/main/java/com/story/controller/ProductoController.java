@@ -93,6 +93,44 @@ public class ProductoController {
                 desdeInstant, hastaInstant, mergedCategorias, carpetaIds, categoriaRaiz, carpetaRaiz);
     }
 
+    @GetMapping("/estadisticas/movimientos")
+    public List<com.story.model.MovimientoPeriodoResponse> movimientosPeriodo(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(name = "categoriaIds", required = false) List<Long> categoriaIds,
+            @RequestParam(name = "carpetaIds", required = false) List<Long> carpetaIds,
+            @RequestParam(name = "categoriaRaiz", defaultValue = "false") boolean categoriaRaiz,
+            @RequestParam(name = "carpetaRaiz", defaultValue = "false") boolean carpetaRaiz,
+            @RequestParam(name = "categoriaId", required = false) Long categoriaIdLegacy) {
+        if (desde.isAfter(hasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
+        }
+        Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        List<Long> mergedCategorias = mergeFilterIds(categoriaIds, categoriaIdLegacy);
+        return inventarioService.movimientosPeriodo(
+                desdeInstant, hastaInstant, mergedCategorias, carpetaIds, categoriaRaiz, carpetaRaiz);
+    }
+
+    @GetMapping("/estadisticas/resultados")
+    public com.story.model.InventarioResultadosResponse resultadosPeriodo(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(name = "categoriaIds", required = false) List<Long> categoriaIds,
+            @RequestParam(name = "carpetaIds", required = false) List<Long> carpetaIds,
+            @RequestParam(name = "categoriaRaiz", defaultValue = "false") boolean categoriaRaiz,
+            @RequestParam(name = "carpetaRaiz", defaultValue = "false") boolean carpetaRaiz,
+            @RequestParam(name = "categoriaId", required = false) Long categoriaIdLegacy) {
+        if (desde.isAfter(hasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "desde no puede ser posterior a hasta");
+        }
+        Instant desdeInstant = desde.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant hastaInstant = hasta.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        List<Long> mergedCategorias = mergeFilterIds(categoriaIds, categoriaIdLegacy);
+        return inventarioService.resultadosPeriodo(
+                desdeInstant, hastaInstant, mergedCategorias, carpetaIds, categoriaRaiz, carpetaRaiz);
+    }
+
     private static List<Long> mergeFilterIds(List<Long> ids, Long legacyId) {
         if (ids != null && !ids.isEmpty()) {
             return ids;

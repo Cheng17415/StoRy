@@ -22,6 +22,7 @@ import {
   guardarArchivoConDialogo,
 } from '../../core/utils/save-file.util';
 import { closeDialogOnBackdropClick } from '../../core/utils/dialog.util';
+import { ExportFormatMenuComponent } from '../../core/components/export-format-menu.component';
 import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
 /** Valores separados por tabulador: Excel abre cada campo en su columna (A1, B1, C1…). */
@@ -55,7 +56,7 @@ function hexToRgb(hex: string): [number, number, number] {
 @Component({
   selector: 'app-stock',
   standalone: true,
-  imports: [RouterLink, RegistrarMovimientoComponent],
+  imports: [RouterLink, RegistrarMovimientoComponent, ExportFormatMenuComponent],
   template: `
     <div class="sb-page">
       <section class="sb-summary" aria-label="Resumen de stock">
@@ -133,17 +134,14 @@ function hexToRgb(hex: string): [number, number, number] {
             }
           </select>
         </label>
-        <div class="sb-export">
-          <button type="button" class="sb-btn sb-btn-export" (click)="exportarCsvPlano()" [disabled]="rows().length === 0">
-            CSV
-          </button>
-          <button type="button" class="sb-btn sb-btn-export" (click)="exportarCsv()" [disabled]="rows().length === 0">
-            Excel
-          </button>
-          <button type="button" class="sb-btn sb-btn-export" (click)="exportarPdf()" [disabled]="rows().length === 0">
-            PDF
-          </button>
-        </div>
+        <app-export-format-menu
+          class="sb-export"
+          [disabled]="rows().length === 0"
+          ariaLabel="Exportar inventario de stock"
+          (exportCsv)="exportarCsvPlano()"
+          (exportExcel)="exportarCsv()"
+          (exportPdf)="exportarPdf()"
+        />
       </div>
 
       @if (loading()) {
@@ -416,8 +414,8 @@ function hexToRgb(hex: string): [number, number, number] {
 
     .sb-export {
       display: flex;
-      gap: 0.45rem;
       margin-left: auto;
+      align-items: center;
     }
 
     .sb-muted,
@@ -579,10 +577,6 @@ function hexToRgb(hex: string): [number, number, number] {
       cursor: not-allowed;
     }
 
-    .sb-btn-export {
-      min-width: 3.5rem;
-    }
-
     .sb-btn-primary {
       border-color: var(--story-primary);
       background: var(--story-primary);
@@ -628,11 +622,7 @@ function hexToRgb(hex: string): [number, number, number] {
 
       .sb-export {
         margin-left: 0;
-        justify-content: stretch;
-      }
-
-      .sb-export .sb-btn {
-        flex: 1;
+        align-self: flex-end;
       }
 
       .sb-actions {

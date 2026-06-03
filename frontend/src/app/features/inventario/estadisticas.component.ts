@@ -2,9 +2,23 @@ import { CurrencyPipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { InventarioEstadisticasDto, CarpetaArbolDto, CategoriaDto } from '../../core/models/catalogo.models';
+import { forkJoin } from 'rxjs';
+import {
+  InventarioEstadisticasDto,
+  InventarioResultadosDto,
+  MovimientoPeriodoDto,
+  CarpetaArbolDto,
+  CategoriaDto,
+} from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
+import { ExportFormatMenuComponent } from '../../core/components/export-format-menu.component';
+import { EstadisticasExportService } from '../../core/services/estadisticas-export.service';
+import { canViewEstadisticas } from '../../core/utils/company-role.util';
+import {
+  GuardarArchivoOpciones,
+  guardarArchivoConDialogo,
+} from '../../core/utils/save-file.util';
 
 interface CarpetaOpcion {
   id: number;
@@ -22,16 +36,26 @@ function flattenCarpetas(nodes: CarpetaArbolDto[], depth = 0): CarpetaOpcion[] {
 }
 
 type PeriodoPresetId = '7d' | '30d' | '90d' | 'mes' | 'mes-anterior' | 'custom';
+type EstadisticasVista = 'resumen' | 'resultados';
 
 interface PeriodoPresetOption {
   id: PeriodoPresetId;
   label: string;
 }
 
+interface ValorDonutSliceVm {
+  key: string;
+  label: string;
+  color: string;
+  dashArray: string;
+  dashOffset: number;
+  valueLine: string;
+}
+
 @Component({
   selector: 'app-estadisticas',
   standalone: true,
-  imports: [RouterLink, CurrencyPipe],
+  imports: [RouterLink, CurrencyPipe, ExportFormatMenuComponent],
   template: `
     <div class="stats-page">
       <div class="stats-page-layout">
@@ -229,77 +253,46 @@ interface PeriodoPresetOption {
         }
 
       @if (data(); as d) {
-        <section class="kpi-row kpi-row--primary" aria-label="Estado actual del inventario">
-          <article class="kpi">
-            <span class="kpi-icon kpi-icon--blue" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10" />
-              </svg>
-            </span>
-            <div>
-              <span class="kpi-label">Productos</span>
-              <span class="kpi-value">{{ d.totalProductos }}</span>
-            </div>
-          </article>
-          <article class="kpi">
-            <span class="kpi-icon kpi-icon--green" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </span>
-            <div>
-              <span class="kpi-label">Valor inventario</span>
-              <span class="kpi-value">{{ d.valorInventarioTotal | currency: auth.companyCurrency() }}</span>
-            </div>
-          </article>
-          <article class="kpi">
-            <span class="kpi-icon kpi-icon--amber" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-7L9 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
-              </svg>
-            </span>
-            <div>
-              <span class="kpi-label">Unidades actuales</span>
-              <span class="kpi-value">{{ d.cantidadActualTotal }}</span>
-            </div>
-          </article>
-          <article class="kpi" [class.kpi-danger]="d.productosBajoMinimo > 0">
-            <span class="kpi-icon kpi-icon--red" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              </svg>
-            </span>
-            <div>
-              <span class="kpi-label">Bajo mínimo</span>
-              <span class="kpi-value">{{ d.productosBajoMinimo }}</span>
-            </div>
-          </article>
-        </section>
+        <nav class="stats-view-tabs" aria-label="Vista de estadísticas">
+          <button
+            type="button"
+            class="stats-view-tab"
+            [class.stats-view-tab--active]="vista() === 'resumen'"
+            [attr.aria-pressed]="vista() === 'resumen'"
+            (click)="setVista('resumen')"
+          >
+            Resumen
+          </button>
+          <button
+            type="button"
+            class="stats-view-tab"
+            [class.stats-view-tab--active]="vista() === 'resultados'"
+            [attr.aria-pressed]="vista() === 'resultados'"
+            (click)="setVista('resultados')"
+          >
+            Beneficios y pérdidas
+          </button>
+        </nav>
 
-        <section class="kpi-row" aria-label="Movimiento del periodo">
-          <article class="kpi compact">
-            <span class="kpi-label">Movimientos</span>
-            <span class="kpi-value">{{ d.totalMovimientos }}</span>
-          </article>
-          <article class="kpi compact">
-            <span class="kpi-label">Unidades entrada</span>
-            <span class="kpi-value">{{ d.unidadesEntrada }}</span>
-          </article>
-          <article class="kpi compact">
-            <span class="kpi-label">Unidades salida</span>
-            <span class="kpi-value">{{ d.unidadesSalida }}</span>
-          </article>
-          <article class="kpi compact">
-            <span class="kpi-label">Balance neto</span>
-            <span class="kpi-value" [class.negative]="balanceNeto(d) < 0">{{ balanceNeto(d) }}</span>
-          </article>
-        </section>
-
+        @if (vista() === 'resumen') {
         <div class="stats-layout">
           <section class="stats-block chart-block" aria-labelledby="serie-title">
-            <div class="block-head">
-              <h2 id="serie-title">Actividad diaria</h2>
-              <span class="block-sub">Entradas, salidas y ajustes por día</span>
+            <div class="block-head block-head--actions">
+              <div class="block-head-text">
+                <h2 id="serie-title">Actividad diaria</h2>
+                <span class="block-sub">{{ periodoLabel() }} · Entradas, salidas y ajustes por día</span>
+              </div>
+              @if (canExport()) {
+                <app-export-format-menu
+                  class="block-head-export"
+                  [disabled]="movimientosPeriodo().length === 0"
+                  [busy]="exportando()"
+                  ariaLabel="Exportar movimientos del periodo"
+                  (exportCsv)="exportarMovimientosCsv()"
+                  (exportExcel)="exportarMovimientosExcel()"
+                  (exportPdf)="exportarMovimientosPdf()"
+                />
+              }
             </div>
             @if (d.seriePorDia.length === 0) {
               <p class="stats-muted">No hay movimientos en este rango.</p>
@@ -329,48 +322,45 @@ interface PeriodoPresetOption {
           <section class="stats-block pie-block" aria-labelledby="valor-pie-title">
             <div class="block-head">
               <h2 id="valor-pie-title">Valor por movimiento</h2>
-              <span class="block-sub">Entradas, salidas y ajustes en el periodo</span>
+              <span class="block-sub">{{ d.totalMovimientos }} movimientos en el periodo</span>
             </div>
-            @if (valorMovimientoTotal(d) <= 0) {
-              <p class="stats-muted">No hay valor de movimiento en este rango.</p>
+            @if (valorMovimientoTotal(d) <= 0 && !hayUnidadesMovimiento(d)) {
+              <p class="stats-muted">No hay movimientos en este rango.</p>
             } @else {
-              <div class="pie-wrap">
-                <div
-                  class="pie-donut"
-                  role="img"
-                  [attr.aria-label]="pieAriaLabel(d)"
-                  [style.background]="pieConicGradient(d)"
-                >
-                  <div class="pie-center">
-                    <span class="pie-center-label">Total</span>
-                    <strong class="pie-center-value">{{ valorMovimientoTotal(d) | currency: auth.companyCurrency() }}</strong>
+              <div class="donut-widget" role="img" [attr.aria-label]="pieAriaLabel(d)">
+                <div class="donut-widget-chart">
+                  <svg viewBox="0 0 200 200" class="donut-svg" aria-hidden="true">
+                    @for (slice of valorDonutSlices(d); track slice.key) {
+                      <circle
+                        class="donut-segment"
+                        cx="100"
+                        cy="100"
+                        r="72"
+                        fill="none"
+                        [attr.stroke]="slice.color"
+                        stroke-width="26"
+                        stroke-linecap="round"
+                        [attr.stroke-dasharray]="slice.dashArray"
+                        [attr.stroke-dashoffset]="slice.dashOffset"
+                        transform="rotate(-90 100 100)"
+                      />
+                    }
+                  </svg>
+                  <div class="donut-center">
+                    <span class="donut-center-label">Total</span>
+                    <strong class="donut-center-value">{{ valorPieCenterText(d) }}</strong>
                   </div>
                 </div>
-                <ul class="pie-legend">
-                  <li>
-                    <span class="pie-legend-dot in"></span>
-                    <span class="pie-legend-text">
-                      <span>Entradas</span>
-                      <strong>{{ valorNum(d.valorEntrada) | currency: auth.companyCurrency() }}</strong>
-                      <em>{{ pctValor(d.valorEntrada, d) }}%</em>
-                    </span>
-                  </li>
-                  <li>
-                    <span class="pie-legend-dot out"></span>
-                    <span class="pie-legend-text">
-                      <span>Salidas</span>
-                      <strong>{{ valorNum(d.valorSalida) | currency: auth.companyCurrency() }}</strong>
-                      <em>{{ pctValor(d.valorSalida, d) }}%</em>
-                    </span>
-                  </li>
-                  <li>
-                    <span class="pie-legend-dot adj"></span>
-                    <span class="pie-legend-text">
-                      <span>Ajustes</span>
-                      <strong>{{ valorNum(d.valorAjuste) | currency: auth.companyCurrency() }}</strong>
-                      <em>{{ pctValor(d.valorAjuste, d) }}%</em>
-                    </span>
-                  </li>
+                <ul class="donut-legend">
+                  @for (slice of valorDonutSlices(d); track slice.key) {
+                    <li>
+                      <span class="donut-legend-swatch" [style.background-color]="slice.color"></span>
+                      <span class="donut-legend-body">
+                        <span class="donut-legend-name">{{ slice.label }}</span>
+                        <strong class="donut-legend-value">{{ slice.valueLine }}</strong>
+                      </span>
+                    </li>
+                  }
                 </ul>
               </div>
             }
@@ -397,6 +387,81 @@ interface PeriodoPresetOption {
           </section>
           </div>
         </div>
+        }
+
+        @if (vista() === 'resultados') {
+          @if (resultados(); as r) {
+            <section class="stats-block" aria-labelledby="resultados-title">
+              <div class="block-head block-head--actions">
+                <div class="block-head-text">
+                  <h2 id="resultados-title">Beneficios y pérdidas</h2>
+                  <span class="block-sub">{{ periodoLabel() }} · {{ r.totalMovimientos }} movimientos</span>
+                </div>
+                @if (canExport()) {
+                  <app-export-format-menu
+                    class="block-head-export"
+                    [busy]="exportando()"
+                    ariaLabel="Descargar informe de beneficios y perdidas"
+                    (exportCsv)="exportarResultadosCsv()"
+                    (exportExcel)="exportarResultadosExcel()"
+                    (exportPdf)="exportarResultadosPdf()"
+                  />
+                }
+              </div>
+
+              <div class="resultados-kpis">
+                <article class="resultados-kpi">
+                  <span class="resultados-kpi-label">Valor salidas</span>
+                  <strong class="resultados-kpi-value">{{ r.valorSalidas | currency: auth.companyCurrency() }}</strong>
+                </article>
+                <article class="resultados-kpi">
+                  <span class="resultados-kpi-label">Valor entradas</span>
+                  <strong class="resultados-kpi-value">{{ r.valorEntradas | currency: auth.companyCurrency() }}</strong>
+                </article>
+                <article
+                  class="resultados-kpi resultados-kpi--highlight"
+                  [class.resultados-kpi--neg]="r.resultadoNeto < 0"
+                  [class.resultados-kpi--pos]="r.resultadoNeto > 0"
+                >
+                  <span class="resultados-kpi-label">Resultado neto</span>
+                  <strong class="resultados-kpi-value">{{ r.resultadoNeto | currency: auth.companyCurrency() }}</strong>
+                </article>
+              </div>
+
+              @if (r.porProducto.length === 0) {
+                <p class="stats-muted">No hay entradas ni salidas con valor en este periodo.</p>
+              } @else {
+                <div class="resultados-table-wrap">
+                  <table class="resultados-table">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th class="num">Entradas</th>
+                        <th class="num">Salidas</th>
+                        <th class="num">Resultado</th>
+                        <th class="num">Uds.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (line of r.porProducto; track line.productoId) {
+                        <tr [class.resultados-row--neg]="line.resultado < 0" [class.resultados-row--pos]="line.resultado > 0">
+                          <td>
+                            <a [routerLink]="['/producto', line.productoId]" class="resultados-link">{{ line.productoNombre }}</a>
+                            <span class="resultados-code">{{ line.productoCodigo }}</span>
+                          </td>
+                          <td class="num">{{ line.valorEntradas | currency: auth.companyCurrency() }}</td>
+                          <td class="num">{{ line.valorSalidas | currency: auth.companyCurrency() }}</td>
+                          <td class="num">{{ line.resultado | currency: auth.companyCurrency() }}</td>
+                          <td class="num resultados-uds">{{ line.unidadesSalida }} / {{ line.unidadesEntrada }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </section>
+          }
+        }
       }
         </div>
       </div>
@@ -924,104 +989,108 @@ interface PeriodoPresetOption {
       align-content: start;
     }
 
-    .pie-wrap {
+    .donut-widget {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 1.25rem;
+      gap: 1.35rem;
+      width: 100%;
     }
 
-    .pie-donut {
+    .donut-widget-chart {
       position: relative;
-      width: 10rem;
-      height: 10rem;
-      border-radius: 50%;
-      flex-shrink: 0;
-      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+      width: min(100%, 13.5rem);
+      aspect-ratio: 1;
     }
 
-    .pie-donut::after {
-      content: '';
-      position: absolute;
-      inset: 24%;
-      border-radius: 50%;
-      background: var(--story-surface);
-      box-shadow: 0 0 0 1px var(--story-border);
+    .donut-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
 
-    .pie-center {
+    .donut-segment {
+      transition: opacity 0.15s ease;
+    }
+
+    .donut-center {
       position: absolute;
       inset: 0;
-      z-index: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 0.2rem;
       padding: 1.5rem;
       text-align: center;
       pointer-events: none;
     }
 
-    .pie-center-label {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
+    .donut-center-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      color: var(--story-text-muted);
+      color: var(--story-text-muted, #94a3b8);
     }
 
-    .pie-center-value {
-      margin-top: 0.15rem;
-      font-size: 0.82rem;
+    .donut-center-value {
+      font-size: 1.35rem;
       font-weight: 700;
-      color: #0f172a;
-      line-height: 1.2;
+      line-height: 1.15;
+      color: var(--story-text, #0f172a);
+      letter-spacing: -0.02em;
     }
 
-    .pie-legend {
+    .donut-legend {
       list-style: none;
       margin: 0;
       padding: 0;
-      display: grid;
-      gap: 0.65rem;
-      min-width: 11rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.85rem 1.35rem;
+      width: 100%;
     }
 
-    .pie-legend li {
+    .donut-legend li {
       display: flex;
       align-items: flex-start;
-      gap: 0.55rem;
+      gap: 0.5rem;
+      min-width: 6.5rem;
     }
 
-    .pie-legend-dot {
-      width: 0.65rem;
-      height: 0.65rem;
-      border-radius: 999px;
+    .donut-legend-swatch {
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 4px;
       margin-top: 0.2rem;
       flex-shrink: 0;
     }
 
-    .pie-legend-dot.in { background: #16a34a; }
-    .pie-legend-dot.out { background: #f59e0b; }
-    .pie-legend-dot.adj { background: #7c3aed; }
-
-    .pie-legend-text {
-      display: grid;
-      gap: 0.1rem;
-      font-size: 0.86rem;
-      color: #64748b;
+    .donut-legend-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
     }
 
-    .pie-legend-text strong {
-      color: #0f172a;
-      font-weight: 700;
-    }
-
-    .pie-legend-text em {
-      font-style: normal;
+    .donut-legend-name {
       font-size: 0.78rem;
-      color: var(--story-text-muted);
+      font-weight: 500;
+      color: var(--story-text-muted, #94a3b8);
+      line-height: 1.2;
+    }
+
+    .donut-legend-value {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--story-text, #0f172a);
+      line-height: 1.25;
+    }
+
+    .pie-block .block-head {
+      margin-bottom: 0.75rem;
     }
 
     .stats-block {
@@ -1034,6 +1103,22 @@ interface PeriodoPresetOption {
 
     .block-head {
       margin-bottom: 1rem;
+    }
+
+    .block-head--actions {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .block-head-text {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .block-head-export {
+      flex: 0 0 auto;
     }
 
     .block-head h2 {
@@ -1236,6 +1321,162 @@ interface PeriodoPresetOption {
       }
     }
 
+    .stats-view-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin: 0 0 1rem;
+      padding: 0.25rem;
+      background: var(--story-surface);
+      border: 1px solid var(--story-border);
+      border-radius: 12px;
+    }
+
+    .stats-view-tab {
+      flex: 1 1 auto;
+      min-width: 7rem;
+      padding: 0.55rem 0.85rem;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--story-text-muted);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .stats-view-tab:hover {
+      color: #0f172a;
+      background: rgba(30, 64, 175, 0.06);
+    }
+
+    .stats-view-tab--active {
+      background: var(--story-primary);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(30, 64, 175, 0.35);
+    }
+
+    .resultados-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .resultados-kpi {
+      padding: 0.85rem 1rem;
+      border: 1px solid var(--story-border);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .resultados-kpi-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--story-text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .resultados-kpi-value {
+      display: block;
+      font-size: 1.15rem;
+      color: #0f172a;
+    }
+
+    .resultados-kpi-hint {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.72rem;
+      color: var(--story-text-muted);
+      line-height: 1.35;
+    }
+
+    .resultados-kpi--highlight {
+      border-color: rgba(30, 64, 175, 0.25);
+      background: rgba(30, 64, 175, 0.04);
+    }
+
+    .resultados-kpi--pos .resultados-kpi-value {
+      color: #15803d;
+    }
+
+    .resultados-kpi--neg .resultados-kpi-value {
+      color: #b91c1c;
+    }
+
+    .resultados-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--story-border);
+      border-radius: 12px;
+    }
+
+    .resultados-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    .resultados-table th,
+    .resultados-table td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--story-border);
+      text-align: left;
+    }
+
+    .resultados-table th.num,
+    .resultados-table td.num {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .resultados-table thead th {
+      background: #f8fafc;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .resultados-link {
+      display: block;
+      color: #0f172a;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .resultados-link:hover {
+      color: var(--story-primary);
+      text-decoration: underline;
+    }
+
+    .resultados-code {
+      display: block;
+      font-size: 0.76rem;
+      color: var(--story-text-muted);
+    }
+
+    .resultados-uds {
+      font-size: 0.8rem;
+      color: var(--story-text-muted);
+    }
+
+    .resultados-row--pos td.num:nth-child(4) {
+      color: #15803d;
+      font-weight: 700;
+    }
+
+    .resultados-row--neg td.num:nth-child(4) {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+
+    @media (max-width: 720px) {
+      .resultados-kpis {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -1251,6 +1492,7 @@ interface PeriodoPresetOption {
 })
 export class EstadisticasComponent implements OnInit {
   private readonly api = inject(CatalogoApiService);
+  private readonly exportSvc = inject(EstadisticasExportService);
   protected readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -1280,8 +1522,15 @@ export class EstadisticasComponent implements OnInit {
   private readonly carpetasArbol = signal<CarpetaArbolDto[]>([]);
   protected readonly carpetasOpciones = computed(() => flattenCarpetas(this.carpetasArbol()));
   protected readonly data = signal<InventarioEstadisticasDto | null>(null);
+  protected readonly movimientosPeriodo = signal<MovimientoPeriodoDto[]>([]);
+  protected readonly resultados = signal<InventarioResultadosDto | null>(null);
+  protected readonly vista = signal<EstadisticasVista>('resumen');
+  protected readonly exportando = signal(false);
   protected readonly loading = signal(false);
   protected readonly errorMsg = signal<string | null>(null);
+  protected readonly canExport = computed(() =>
+    canViewEstadisticas(this.auth.currentUser()?.companyRole),
+  );
 
   ngOnInit(): void {
     this.api.getCategorias().subscribe({
@@ -1426,29 +1675,38 @@ export class EstadisticasComponent implements OnInit {
     this.cargar();
   }
 
+  protected setVista(v: EstadisticasVista): void {
+    this.vista.set(v);
+  }
+
   protected cargar(): void {
     if (!this.rangoValido()) {
       return;
     }
     this.loading.set(true);
     this.errorMsg.set(null);
-    this.api
-      .getInventarioEstadisticas(
-        this.desdeStr(),
-        this.hastaStr(),
-        this.categoriasSeleccionadas(),
-        this.carpetasSeleccionadas(),
-        this.categoriaRaizSeleccionada(),
-        this.carpetaRaizSeleccionada(),
-      )
+    const desde = this.desdeStr();
+    const hasta = this.hastaStr();
+    const categorias = this.categoriasSeleccionadas();
+    const carpetas = this.carpetasSeleccionadas();
+    const catRaiz = this.categoriaRaizSeleccionada();
+    const carpRaiz = this.carpetaRaizSeleccionada();
+
+    forkJoin({
+      stats: this.api.getInventarioEstadisticas(desde, hasta, categorias, carpetas, catRaiz, carpRaiz),
+      movimientos: this.api.getMovimientosPeriodo(desde, hasta, categorias, carpetas, catRaiz, carpRaiz),
+      resultados: this.api.getResultadosPeriodo(desde, hasta, categorias, carpetas, catRaiz, carpRaiz),
+    })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (d) => {
-          this.data.set(d);
-          const max = d.seriePorDia.length
+        next: ({ stats, movimientos, resultados }) => {
+          this.data.set(stats);
+          this.movimientosPeriodo.set(movimientos);
+          this.resultados.set(resultados);
+          const max = stats.seriePorDia.length
             ? Math.max(
                 1,
-                ...d.seriePorDia.flatMap((s) => [
+                ...stats.seriePorDia.flatMap((s) => [
                   s.entradasUnidades,
                   s.salidasUnidades,
                   s.ajustesUnidades,
@@ -1459,18 +1717,149 @@ export class EstadisticasComponent implements OnInit {
           this.loading.set(false);
         },
         error: () => {
+          this.data.set(null);
+          this.movimientosPeriodo.set([]);
+          this.resultados.set(null);
           this.loading.set(false);
           this.errorMsg.set('No se pudieron cargar las estadísticas. Revisa la sesión y el rango de fechas.');
         },
       });
   }
 
+  protected exportarMovimientosCsv(): void {
+    void this.exportarMovimientos('csv');
+  }
+
+  protected exportarMovimientosExcel(): void {
+    void this.exportarMovimientos('excel');
+  }
+
+  protected exportarMovimientosPdf(): void {
+    void this.exportarMovimientos('pdf');
+  }
+
+  protected exportarResultadosCsv(): void {
+    void this.exportarResultados('csv');
+  }
+
+  protected exportarResultadosExcel(): void {
+    void this.exportarResultados('excel');
+  }
+
+  protected exportarResultadosPdf(): void {
+    void this.exportarResultados('pdf');
+  }
+
+  private formatCurrencyExport(n: number): string {
+    return new Intl.NumberFormat('es', {
+      style: 'currency',
+      currency: this.auth.companyCurrency(),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+
+  private async exportarMovimientos(kind: 'csv' | 'excel' | 'pdf'): Promise<void> {
+    const rows = this.movimientosPeriodo();
+    if (rows.length === 0 || this.exportando()) {
+      return;
+    }
+    const desde = this.desdeStr();
+    const hasta = this.hastaStr();
+    const meta = this.exportSvc.metaMovimientos(desde, hasta, rows.length);
+    const fmt = (n: number) => this.formatCurrencyExport(n);
+
+    this.exportando.set(true);
+    try {
+      if (kind === 'csv') {
+        await this.guardarExport(() => this.exportSvc.buildMovimientosCsv(rows, fmt), {
+          suggestedName: `${meta.slug}.csv`,
+          description: 'CSV (valores separados)',
+          mimeType: 'text/csv',
+          extension: 'csv',
+        });
+      } else if (kind === 'excel') {
+        await this.guardarExport(() => this.exportSvc.buildMovimientosExcel(rows, meta, fmt), {
+          suggestedName: `${meta.slug}.xlsx`,
+          description: 'Libro de Excel',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          extension: 'xlsx',
+        });
+      } else {
+        await this.guardarExport(() => this.exportSvc.buildMovimientosPdf(rows, meta, fmt), {
+          suggestedName: `${meta.slug}.pdf`,
+          description: 'Documento PDF',
+          mimeType: 'application/pdf',
+          extension: 'pdf',
+        });
+      }
+    } finally {
+      this.exportando.set(false);
+    }
+  }
+
+  private async exportarResultados(kind: 'csv' | 'excel' | 'pdf'): Promise<void> {
+    const r = this.resultados();
+    if (!r || this.exportando()) {
+      return;
+    }
+    const desde = this.desdeStr();
+    const hasta = this.hastaStr();
+    const meta = this.exportSvc.metaResultados(desde, hasta);
+    const fmt = (n: number) => this.formatCurrencyExport(n);
+
+    this.exportando.set(true);
+    try {
+      if (kind === 'csv') {
+        await this.guardarExport(() => this.exportSvc.buildResultadosCsv(r, fmt), {
+          suggestedName: `${meta.slug}.csv`,
+          description: 'CSV (valores separados)',
+          mimeType: 'text/csv',
+          extension: 'csv',
+        });
+      } else if (kind === 'excel') {
+        await this.guardarExport(() => this.exportSvc.buildResultadosExcel(r, meta, fmt), {
+          suggestedName: `${meta.slug}.xlsx`,
+          description: 'Libro de Excel',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          extension: 'xlsx',
+        });
+      } else {
+        await this.guardarExport(() => this.exportSvc.buildResultadosPdf(r, meta, fmt), {
+          suggestedName: `${meta.slug}.pdf`,
+          description: 'Documento PDF',
+          mimeType: 'application/pdf',
+          extension: 'pdf',
+        });
+      }
+    } finally {
+      this.exportando.set(false);
+    }
+  }
+
+  private async guardarExport(
+    crearBlob: () => Promise<Blob> | Blob,
+    opciones: GuardarArchivoOpciones,
+  ): Promise<void> {
+    const resultado = await guardarArchivoConDialogo(crearBlob, opciones);
+    if (resultado.ok || resultado.reason === 'cancelled') {
+      return;
+    }
+    if (resultado.reason === 'unsupported') {
+      this.errorMsg.set(
+        'Tu navegador no permite elegir dónde guardar. Usa Chrome o Edge actualizado en HTTPS o localhost.',
+      );
+      return;
+    }
+    this.errorMsg.set('No se pudo guardar el archivo.');
+  }
+
   protected pctSerie(unidades: number): number {
     return Math.max(unidades > 0 ? 4 : 0, (unidades / this.maxUnidadesEnSerie()) * 100);
   }
 
-  protected balanceNeto(d: InventarioEstadisticasDto): number {
-    return d.unidadesEntrada - d.unidadesSalida;
+  protected hayUnidadesMovimiento(d: InventarioEstadisticasDto): boolean {
+    return d.unidadesEntrada + d.unidadesSalida + d.unidadesAjuste > 0;
   }
 
   protected valorNum(v: number | null | undefined): number {
@@ -1482,32 +1871,83 @@ export class EstadisticasComponent implements OnInit {
     return this.valorNum(d.valorEntrada) + this.valorNum(d.valorSalida) + this.valorNum(d.valorAjuste);
   }
 
-  protected pctValor(valor: number | null | undefined, d: InventarioEstadisticasDto): number {
-    const total = this.valorMovimientoTotal(d);
-    if (total <= 0) {
-      return 0;
+  protected valorPieCenterText(d: InventarioEstadisticasDto): string {
+    const currency = this.auth.companyCurrency();
+    const totalValor = this.valorMovimientoTotal(d);
+    if (totalValor > 0) {
+      return this.formatCurrencyCompact(totalValor, currency);
     }
-    return Math.round((this.valorNum(valor) / total) * 100);
+    const totalUds = d.unidadesEntrada + d.unidadesSalida + d.unidadesAjuste;
+    return `${totalUds} uds.`;
   }
 
-  protected pieConicGradient(d: InventarioEstadisticasDto): string {
-    const total = this.valorMovimientoTotal(d);
+  protected valorDonutSlices(d: InventarioEstadisticasDto): ValorDonutSliceVm[] {
+    const useUnits = this.valorMovimientoTotal(d) <= 0 && this.hayUnidadesMovimiento(d);
+    const currency = this.auth.companyCurrency();
+    const radius = 72;
+    const circumference = 2 * Math.PI * radius;
+
+    const defs = [
+      { key: 'entrada', label: 'Entradas', color: '#16a34a', value: this.valorNum(d.valorEntrada), units: d.unidadesEntrada },
+      { key: 'salida', label: 'Salidas', color: '#f59e0b', value: this.valorNum(d.valorSalida), units: d.unidadesSalida },
+      { key: 'ajuste', label: 'Ajustes', color: '#7c3aed', value: this.valorNum(d.valorAjuste), units: d.unidadesAjuste },
+    ];
+
+    const items = defs
+      .map((item) => ({ ...item, weight: useUnits ? item.units : item.value }))
+      .filter((item) => item.weight > 0);
+
+    const total = items.reduce((sum, item) => sum + item.weight, 0);
     if (total <= 0) {
-      return 'conic-gradient(#e2e8f0 0deg 360deg)';
+      return [];
     }
-    const e = (this.valorNum(d.valorEntrada) / total) * 360;
-    const s = (this.valorNum(d.valorSalida) / total) * 360;
-    const degEntrada = e;
-    const degSalida = e + s;
-    return `conic-gradient(
-      #16a34a 0deg ${degEntrada}deg,
-      #f59e0b ${degEntrada}deg ${degSalida}deg,
-      #7c3aed ${degSalida}deg 360deg
-    )`;
+
+    const segmentGap = items.length > 1 ? 5 : 0;
+    let offset = 0;
+
+    return items.map((item) => {
+      const pct = (item.weight / total) * 100;
+      const segmentLen = Math.max(0, (item.weight / total) * circumference - segmentGap);
+      const dashArray = `${segmentLen} ${circumference - segmentLen}`;
+      const dashOffset = -offset;
+
+      offset += segmentLen + segmentGap;
+
+      const pctLabel = `${pct.toFixed(pct >= 10 ? 0 : 1)}%`;
+      let valueLine: string;
+      if (useUnits) {
+        valueLine = `${item.units} uds. (${pctLabel})`;
+      } else {
+        const amount = this.formatCurrencyCompact(item.value, currency);
+        valueLine =
+          item.units > 0 && item.key !== 'ajuste'
+            ? `${amount} · ${item.units} uds. (${pctLabel})`
+            : `${amount} (${pctLabel})`;
+      }
+
+      return {
+        key: item.key,
+        label: item.label,
+        color: item.color,
+        dashArray,
+        dashOffset,
+        valueLine,
+      };
+    });
   }
 
   protected pieAriaLabel(d: InventarioEstadisticasDto): string {
-    const currency = this.auth.companyCurrency();
-    return `Entradas ${this.pctValor(d.valorEntrada, d)} por ciento, salidas ${this.pctValor(d.valorSalida, d)} por ciento, ajustes ${this.pctValor(d.valorAjuste, d)} por ciento. Total en ${currency}.`;
+    return this.valorDonutSlices(d)
+      .map((s) => `${s.label}: ${s.valueLine}`)
+      .join('. ');
   }
+
+  private formatCurrencyCompact(amount: number, currency: string): string {
+    return new Intl.NumberFormat('es', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: amount >= 1000 ? 0 : 2,
+    }).format(amount);
+  }
+
 }

@@ -1,10 +1,14 @@
 package com.story.service;
 
+import com.story.model.Categoria;
 import com.story.model.InventarioEstadisticasResponse;
+import com.story.model.InventarioResultadosResponse;
+import com.story.model.MovimientoPeriodoResponse;
 import com.story.model.MovimientoStock;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.Producto;
 import com.story.model.ProductoSalidaResumen;
+import com.story.model.ResultadoProductoLineaResponse;
 import com.story.model.SerieDiaMovimiento;
 import com.story.model.TipoMovimiento;
 import com.story.repository.CategoriaRepository;
@@ -21,6 +25,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Service
 public class InventarioService {
@@ -68,6 +74,9 @@ public class InventarioService {
                 .toList();
     }
 
+    private record EstadisticasDatos(List<Producto> productos, List<MovimientoStock> movimientos) {
+    }
+
     /**
      * Agrega movimientos de la empresa en {@code [desde, hasta)} (instantes UTC) para cuadros de mando y series por día.
      */
@@ -80,39 +89,9 @@ public class InventarioService {
             boolean categoriaRaiz,
             boolean carpetaRaiz
     ) {
-        currentUserService.requireCompanyAdminOrAnalyticsViewer();
-        if (!desde.isBefore(hasta)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El instante 'desde' debe ser anterior a 'hasta'");
-        }
-        long maxSeconds = 366L * 24 * 3600;
-        if (hasta.getEpochSecond() - desde.getEpochSecond() > maxSeconds) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 366 días");
-        }
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        List<Long> catFilter = normalizeIdList(categoriaIds);
-        List<Long> carpFilter = normalizeIdList(carpetaIds);
-        for (Long categoriaId : catFilter) {
-            categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
-        }
-        for (Long carpetaId : carpFilter) {
-            productoCarpetaRepository.findByIdAndCompany_Id(carpetaId, companyId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
-        }
-        List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
-                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter, categoriaRaiz, carpetaRaiz))
-                .toList();
-        Set<Long> productoIds = new HashSet<>();
-        for (Producto p : productos) {
-            productoIds.add(p.getId());
-        }
-        List<MovimientoStock> rows = movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
-        boolean filtraProducto = !catFilter.isEmpty() || categoriaRaiz || !carpFilter.isEmpty() || carpetaRaiz;
-        if (filtraProducto) {
-            rows = rows.stream()
-                    .filter(m -> productoIds.contains(m.getProducto().getId()))
-                    .toList();
-        }
+        EstadisticasDatos datos = cargarDatosEstadisticas(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz);
+        List<Producto> productos = datos.productos();
+        List<MovimientoStock> rows = datos.movimientos();
 
         long unidadesEntrada = 0;
         long unidadesSalida = 0;
@@ -197,6 +176,148 @@ public class InventarioService {
                 valorInventarioTotal,
                 serie,
                 topSalidas);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MovimientoPeriodoResponse> movimientosPeriodo(
+            Instant desde,
+            Instant hasta,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
+        EstadisticasDatos datos = cargarDatosEstadisticas(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz);
+        Map<Long, Producto> productoPorId = new HashMap<>();
+        for (Producto p : datos.productos()) {
+            productoPorId.put(p.getId(), p);
+        }
+        return datos.movimientos().stream()
+                .map(m -> toMovimientoPeriodo(m, productoPorId.get(m.getProducto().getId())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public InventarioResultadosResponse resultadosPeriodo(
+            Instant desde,
+            Instant hasta,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
+        EstadisticasDatos datos = cargarDatosEstadisticas(desde, hasta, categoriaIds, carpetaIds, categoriaRaiz, carpetaRaiz);
+        BigDecimal valorEntradas = BigDecimal.ZERO;
+        BigDecimal valorSalidas = BigDecimal.ZERO;
+        BigDecimal valorAjustes = BigDecimal.ZERO;
+        long unidadesEntrada = 0;
+        long unidadesSalida = 0;
+        long unidadesAjuste = 0;
+
+        Map<Long, ResultadoProductoLineaResponse> porProducto = new HashMap<>();
+
+        for (MovimientoStock m : datos.movimientos()) {
+            Producto p = m.getProducto();
+            int c = m.getCantidad();
+            BigDecimal valor = valorMovimiento(m, c);
+            ResultadoProductoLineaResponse prev = porProducto.get(p.getId());
+            BigDecimal ent = prev != null ? prev.valorEntradas() : BigDecimal.ZERO;
+            BigDecimal sal = prev != null ? prev.valorSalidas() : BigDecimal.ZERO;
+            long uEnt = prev != null ? prev.unidadesEntrada() : 0;
+            long uSal = prev != null ? prev.unidadesSalida() : 0;
+
+            switch (m.getTipo()) {
+                case ENTRADA -> {
+                    valorEntradas = valorEntradas.add(valor);
+                    unidadesEntrada += c;
+                    ent = ent.add(valor);
+                    uEnt += c;
+                }
+                case SALIDA -> {
+                    valorSalidas = valorSalidas.add(valor);
+                    unidadesSalida += c;
+                    sal = sal.add(valor);
+                    uSal += c;
+                }
+                case AJUSTE -> {
+                    valorAjustes = valorAjustes.add(valor);
+                    unidadesAjuste += c;
+                }
+            }
+
+            if (m.getTipo() != TipoMovimiento.AJUSTE) {
+                porProducto.put(
+                        p.getId(),
+                        new ResultadoProductoLineaResponse(
+                                p.getId(),
+                                p.getNombre(),
+                                p.getCodigo(),
+                                ent,
+                                sal,
+                                sal.subtract(ent),
+                                uEnt,
+                                uSal));
+            }
+        }
+
+        List<ResultadoProductoLineaResponse> lineas = porProducto.values().stream()
+                .sorted(Comparator.comparing(ResultadoProductoLineaResponse::resultado).reversed())
+                .toList();
+
+        return new InventarioResultadosResponse(
+                valorEntradas,
+                valorSalidas,
+                valorAjustes,
+                valorSalidas.subtract(valorEntradas),
+                unidadesEntrada,
+                unidadesSalida,
+                unidadesAjuste,
+                datos.movimientos().size(),
+                lineas);
+    }
+
+    private EstadisticasDatos cargarDatosEstadisticas(
+            Instant desde,
+            Instant hasta,
+            List<Long> categoriaIds,
+            List<Long> carpetaIds,
+            boolean categoriaRaiz,
+            boolean carpetaRaiz
+    ) {
+        currentUserService.requireCompanyAdminOrAnalyticsViewer();
+        if (!desde.isBefore(hasta)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El instante 'desde' debe ser anterior a 'hasta'");
+        }
+        long maxSeconds = 366L * 24 * 3600;
+        if (hasta.getEpochSecond() - desde.getEpochSecond() > maxSeconds) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rango máximo: 366 días");
+        }
+        Long companyId = currentUserService.requireCurrentCompanyId();
+        List<Long> catFilter = normalizeIdList(categoriaIds);
+        List<Long> carpFilter = normalizeIdList(carpetaIds);
+        for (Long categoriaId : catFilter) {
+            categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
+        }
+        for (Long carpetaId : carpFilter) {
+            productoCarpetaRepository.findByIdAndCompany_Id(carpetaId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        }
+        List<Producto> productos = productoRepository.findAllByCompany_IdWithCategorias(companyId).stream()
+                .filter(p -> matchesEstadisticasFilters(p, catFilter, carpFilter, categoriaRaiz, carpetaRaiz))
+                .toList();
+        Set<Long> productoIds = new HashSet<>();
+        for (Producto p : productos) {
+            productoIds.add(p.getId());
+        }
+        List<MovimientoStock> rows = movimientoStockRepository.findByCompanyAndFechaRange(companyId, desde, hasta);
+        boolean filtraProducto = !catFilter.isEmpty() || categoriaRaiz || !carpFilter.isEmpty() || carpetaRaiz;
+        if (filtraProducto) {
+            rows = rows.stream()
+                    .filter(m -> productoIds.contains(m.getProducto().getId()))
+                    .toList();
+        }
+        return new EstadisticasDatos(productos, rows);
     }
 
     /**
@@ -367,5 +488,33 @@ public class InventarioService {
                 m.getObservacion(),
                 m.getUsuario().getUsername()
         );
+    }
+
+    private static MovimientoPeriodoResponse toMovimientoPeriodo(MovimientoStock m, Producto productoDetalle) {
+        Producto p = productoDetalle != null ? productoDetalle : m.getProducto();
+        int unidades = m.getCantidad();
+        return new MovimientoPeriodoResponse(
+                m.getId(),
+                m.getTipo().name(),
+                unidades,
+                m.getFecha(),
+                m.getObservacion(),
+                m.getUsuario().getUsername(),
+                p.getId(),
+                p.getNombre(),
+                p.getCodigo(),
+                formatCategorias(p),
+                p.getCarpeta() != null ? p.getCarpeta().getNombre() : "Raíz",
+                valorMovimiento(m, unidades));
+    }
+
+    private static String formatCategorias(Producto p) {
+        if (p.getCategorias() == null || p.getCategorias().isEmpty()) {
+            return "—";
+        }
+        return p.getCategorias().stream()
+                .map(Categoria::getNombre)
+                .sorted()
+                .collect(Collectors.joining(", "));
     }
 }
