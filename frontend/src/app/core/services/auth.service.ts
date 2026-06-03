@@ -19,6 +19,7 @@ export class AuthService {
   });
   readonly currentUser = computed(() => this.user());
   readonly inCompany = computed(() => this.currentUser()?.companyId != null);
+  readonly companyCurrency = computed(() => this.currentUser()?.companyCurrency ?? 'EUR');
 
   defaultHomeRoute(): string {
     return this.inCompany() ? '/productos' : '/empresa';

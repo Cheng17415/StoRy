@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Configuration;
         GoogleOAuthProperties.class,
         UploadProperties.class,
         SupabaseProperties.class,
-        ResendProperties.class
+        ResendProperties.class,
+        OpenFoodFactsProperties.class
 })
 public class PropertiesConfig {
 }

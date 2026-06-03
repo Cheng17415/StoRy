@@ -36,6 +36,11 @@ export interface ProductoFormPayload {
   /** Notas del producto (mapea a `descripcion` en API). */
   descripcion: string;
   imagen: File | null;
+  /** URL externa (p. ej. Open Food Facts) cuando no hay fichero subido. */
+  imagenUrl?: string | null;
+  codigoBarras?: string | null;
+  nutriScore?: string | null;
+  alergenos?: string[] | null;
   /** Carpeta actual al crear; omitir para raíz. */
   carpetaId?: number | null;
 }
@@ -202,6 +207,18 @@ export class CatalogoApiService {
     if (payload.imagen) {
       fd.append('imagen', payload.imagen);
     }
+    if (payload.imagenUrl) {
+      fd.append('imagenUrl', payload.imagenUrl);
+    }
+    if (payload.codigoBarras) {
+      fd.append('codigoBarras', payload.codigoBarras);
+    }
+    if (payload.nutriScore) {
+      fd.append('nutriScore', payload.nutriScore);
+    }
+    if (payload.alergenos?.length) {
+      fd.append('alergenos', JSON.stringify(payload.alergenos));
+    }
     if (payload.carpetaId != null) {
       fd.append('carpetaId', String(payload.carpetaId));
     }
@@ -252,6 +269,14 @@ export class CatalogoApiService {
 
   clonarProducto(id: number): Observable<ProductoDto> {
     return this.http.post<ProductoDto>(`/api/productos/${id}/clone`, {}, this.authBearerOpts());
+  }
+
+  registrarCodigoBarras(productoId: number, codigoBarras: string): Observable<ProductoDto> {
+    return this.http.patch<ProductoDto>(
+      `/api/productos/${productoId}/codigo-barras`,
+      { codigoBarras },
+      this.authBearerOpts(),
+    );
   }
 
   deleteProducto(id: number): Observable<void> {

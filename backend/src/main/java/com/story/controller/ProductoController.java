@@ -6,6 +6,7 @@ import com.story.model.InventarioEstadisticasResponse;
 import com.story.model.MovimientoStockResponse;
 import com.story.model.MoverProductoCarpetaRequest;
 import com.story.model.ProductoResponse;
+import com.story.model.RegistrarCodigoBarrasRequest;
 import com.story.model.RegistrarMovimientoRequest;
 import com.story.service.CatalogoService;
 import com.story.service.InventarioService;
@@ -134,9 +135,25 @@ public class ProductoController {
             @RequestParam(required = false) String stockMinimo,
             @RequestParam(required = false) String descripcion,
             @RequestParam(required = false) MultipartFile imagen,
+            @RequestParam(required = false) String imagenUrl,
+            @RequestParam(required = false) String codigoBarras,
+            @RequestParam(required = false) String nutriScore,
+            @RequestParam(required = false) String alergenos,
             @RequestParam(required = false) Long carpetaId
     ) {
-        return catalogoService.crearProducto(nombre, cantidad, precio, stockMinimo, descripcion, imagen, carpetaId);
+        return catalogoService.crearProducto(
+                nombre,
+                cantidad,
+                precio,
+                stockMinimo,
+                descripcion,
+                imagen,
+                imagenUrl,
+                codigoBarras,
+                nutriScore,
+                alergenos,
+                carpetaId
+        );
     }
 
     /**
@@ -169,6 +186,14 @@ public class ProductoController {
             @RequestBody ActualizarStockMinimoRequest body
     ) {
         return catalogoService.actualizarStockMinimo(id, body.stockMinimo());
+    }
+
+    @PatchMapping("/{id}/codigo-barras")
+    public ProductoResponse registrarCodigoBarras(
+            @PathVariable Long id,
+            @Valid @RequestBody RegistrarCodigoBarrasRequest body
+    ) {
+        return catalogoService.registrarCodigoBarras(id, body.codigoBarras());
     }
 
     @PostMapping("/{id}/categorias")

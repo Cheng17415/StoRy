@@ -41,3 +41,136 @@ a {
 a:hover {
   color: var(--story-primary-hover);
 }
+
+/* Open Food Facts: Nutri-Score y alérgenos (compartido entre catálogo y ficha) */
+.story-nutri {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.story-nutri--a { background: #038141; }
+.story-nutri--b { background: #85bb2f; }
+.story-nutri--c { background: #fecb02; color: #1e293b; }
+.story-nutri--d { background: #ee8100; }
+.story-nutri--e { background: #e63e11; }
+
+.story-allergen-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.story-allergen-tag {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(30, 64, 175, 0.1);
+  color: var(--story-primary);
+  text-transform: capitalize;
+}
+
+.story-off-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed var(--story-border);
+}
+
+.story-off-search-btn {
+  align-self: flex-start;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border: 1px solid var(--story-border);
+  border-radius: 8px;
+  background: var(--story-bg-page);
+  color: var(--story-text);
+  cursor: pointer;
+}
+
+.story-off-search-btn:hover:not(:disabled) {
+  background: var(--story-surface);
+}
+
+.story-off-search-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.story-off-error {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--story-danger);
+}
+
+.story-off-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.story-off-preview-img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--story-border);
+}
+
+/* Modales: cierre con X y clic en backdrop */
+.modal-head-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-right: 0.15rem;
+}
+
+.modal-head-bar__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: -0.2rem -0.2rem 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--story-focus-ring);
+}
+
+.modal-actions--end {
+  justify-content: flex-end;
+}

@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
+import { canViewEstadisticas } from './core/utils/company-role.util';
 
 @Component({
   selector: 'app-root',
@@ -51,7 +52,6 @@ export class AppComponent {
 
   /** Estadísticas de inventario: administrador de empresa o analytics_viewer (alineado con la API). */
   protected puedeVerEstadisticas(): boolean {
-    const r = this.auth.currentUser()?.companyRole;
-    return r === 'company_admin' || r === 'analytics_viewer';
+    return canViewEstadisticas(this.auth.currentUser()?.companyRole);
   }
 }

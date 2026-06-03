@@ -3,6 +3,7 @@ package com.story.service;
 import com.story.model.Usuario;
 import com.story.model.CompanyMember;
 import com.story.model.CompanyRole;
+import com.story.security.CompanyAdminMessages;
 import com.story.repository.CompanyMemberRepository;
 import com.story.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
@@ -62,9 +63,13 @@ public class CurrentUserService {
     }
 
     public void requireCompanyAdmin() {
+        requireCompanyAdmin(CompanyAdminMessages.DEFAULT);
+    }
+
+    public void requireCompanyAdmin(String forbiddenMessage) {
         CompanyRole role = requireCurrentCompanyRole();
         if (role != CompanyRole.company_admin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo el administrador de empresa puede realizar esta acción");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
     }
 

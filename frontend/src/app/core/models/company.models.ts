@@ -51,3 +51,16 @@ export interface InviteMemberPayload {
 export interface UpdateMemberRolePayload {
   role: CompanyRole;
 }
+
+export interface UpdateCompanyCurrencyPayload {
+  currency: CompanyCurrency;
+}
+
+export interface UpdateCompanyNamePayload {
+  name: string;
+}
+
+export interface UpdateCompanyPasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}

@@ -1,11 +1,18 @@
-import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, signal, viewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { catchError, forkJoin, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, Observable, of, switchMap } from 'rxjs';
 import { AccountApiService } from '../../core/services/account-api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { CompanyApiService } from '../../core/services/company-api.service';
-import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models/company.models';
+import {
+  CompanyCurrency,
+  CompanyPageDto,
+  CompanyRole,
+  CompanyMemberDto,
+} from '../../core/models/company.models';
+import { isCompanyAdmin as checkCompanyAdmin, roleLabel } from '../../core/utils/company-role.util';
+import { closeDialogOnBackdropClick } from '../../core/utils/dialog.util';
 
 @Component({
   selector: 'app-company',
@@ -32,31 +39,51 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
 
       @if (companyPage(); as page) {
         <section class="company-hero" aria-labelledby="company-title">
-          <div class="company-hero-main">
+          <div class="company-hero-top">
             <div class="company-copy">
               <p class="eyebrow">Espacio de trabajo</p>
               <h1 id="company-title">{{ page.company.name }}</h1>
               <div class="role-row">
-                <span class="role-pill" [class.role-pill--admin]="page.company.role === 'company_admin'">
-                  {{ page.company.role === 'company_admin' ? 'Propietario' : page.company.role }}
+                <span class="role-pill" [class.role-pill--admin]="isCompanyAdmin()">
+                  {{ isCompanyAdmin() ? 'Propietario' : roleLabel(currentCompanyRole() ?? 'employee') }}
                 </span>
+                <span class="meta-currency">{{ currencyLabel(page.company.currency) }} ({{ page.company.currency }})</span>
               </div>
             </div>
+            @if (isCompanyAdmin()) {
+              <div class="co-more-wrap" #moreRoot>
+                <button
+                  type="button"
+                  class="co-icon-btn"
+                  [attr.aria-expanded]="moreMenuOpen()"
+                  aria-haspopup="menu"
+                  title="Opciones del espacio"
+                  (click)="toggleMoreMenu($event)"
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2" fill="currentColor" />
+                    <circle cx="12" cy="12" r="2" fill="currentColor" />
+                    <circle cx="12" cy="19" r="2" fill="currentColor" />
+                  </svg>
+                </button>
+                @if (moreMenuOpen()) {
+                  <div class="co-more-panel" role="menu">
+                    <button type="button" role="menuitem" class="co-more-item" (click)="openEditDialog()">
+                      Editar empresa
+                    </button>
+                  </div>
+                }
+              </div>
+            }
           </div>
 
           <div class="actions-row">
-            <button class="btn btn-outline" type="button" (click)="openMembersModal()">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Miembros
-            </button>
-            @if (page.company.role === 'company_admin') {
+            @if (isCompanyAdmin()) {
               <button class="btn btn-primary" type="button" (click)="openInviteModal()">
                 <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                   <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
                 </svg>
-                Invitar
+                Invitar miembro
               </button>
             }
             <button class="btn btn-danger" type="button" (click)="leaveCompany()">
@@ -68,40 +95,73 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
           </div>
         </section>
 
-        <section class="company-stats" aria-label="Resumen de empresa">
-          <article class="stat-card">
-            <span class="stat-icon stat-icon--blue" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </span>
-            <div>
-              <span class="stat-label">Miembros</span>
-              <strong class="stat-value">{{ page.members.length }}</strong>
-            </div>
-          </article>
-          <article class="stat-card">
-            <span class="stat-icon stat-icon--amber" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
-              </svg>
-            </span>
-            <div>
-              <span class="stat-label">Invitaciones</span>
-              <strong class="stat-value">{{ pendingInvitations().length }}</strong>
-            </div>
-          </article>
-          <article class="stat-card">
-            <span class="stat-icon stat-icon--green" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </span>
-            <div>
-              <span class="stat-label">Moneda</span>
-              <strong class="stat-value">{{ page.company.currency }}</strong>
-            </div>
-          </article>
+        <section class="members-section" aria-labelledby="members-heading">
+          <header class="members-header">
+            <h2 id="members-heading">Miembros</h2>
+            <span class="members-count">{{ page.members.length }} activos · {{ pendingInvitations().length }} invitaciones</span>
+          </header>
+          <div class="members-panel">
+            <ul class="members-list">
+              @for (m of page.members; track m.userId) {
+                <li class="member-row">
+                  <span class="member-avatar" aria-hidden="true">{{ m.name.slice(0, 1).toUpperCase() }}</span>
+                  <div class="member-main">
+                    <span class="member-name">{{ m.name }}</span>
+                    <span class="member-email">{{ m.email }}</span>
+                    @if (m.email === currentEmail()) {
+                      <span class="meta-you">Tú</span>
+                    }
+                  </div>
+                  <div class="member-actions">
+                    @if (isCompanyAdmin()) {
+                      <label class="member-role-select">
+                        <span class="sr-only">Rol de {{ m.name }}</span>
+                        <select
+                          [value]="m.role"
+                          [disabled]="updatingMemberRoleUserId() === m.userId || loading() || isSoleOwner(m, page.members)"
+                          [title]="isSoleOwner(m, page.members) ? 'Debe haber al menos un propietario' : null"
+                          (change)="changeMemberRole(m, page.members, $any($event.target).value)"
+                        >
+                          <option value="employee">{{ roleLabel('employee') }}</option>
+                          <option value="analytics_viewer">{{ roleLabel('analytics_viewer') }}</option>
+                          <option value="company_admin">{{ roleLabel('company_admin') }}</option>
+                        </select>
+                      </label>
+                      @if (canRemoveMember(m, page.members)) {
+                        <button
+                          type="button"
+                          class="member-remove-btn"
+                          title="Eliminar de la empresa"
+                          [disabled]="removingMemberUserId() === m.userId || loading()"
+                          (click)="removeMember(m)"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                          </svg>
+                          <span class="sr-only">Eliminar {{ m.name }}</span>
+                        </button>
+                      }
+                    } @else {
+                      <span class="member-role-readonly">{{ roleLabel(m.role) }}</span>
+                    }
+                  </div>
+                </li>
+              }
+              @for (i of pendingInvitations(); track i.id) {
+                <li class="member-row member-row--pending">
+                  <span class="member-avatar member-avatar--pending" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                    </svg>
+                  </span>
+                  <div class="member-main">
+                    <span class="member-name">{{ i.email }}</span>
+                    <span class="member-email">Invitación pendiente · {{ roleLabel(i.role) }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
         </section>
       } @else {
         <div class="empty-state">
@@ -127,10 +187,19 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
         </div>
       }
 
-      <dialog #createDialog class="modal" (cancel)="$event.preventDefault()">
+      <dialog #createDialog class="modal" (click)="closeDialogOnBackdropClick($event, closeCreateModal.bind(this))">
         <div class="modal-inner">
-          <p class="modal-eyebrow">Nuevo espacio</p>
-          <h2 class="modal-title">Crear empresa</h2>
+          <div class="modal-head-bar">
+            <div class="modal-head-bar__main">
+              <p class="modal-eyebrow">Nuevo espacio</p>
+              <h2 class="modal-title">Crear empresa</h2>
+            </div>
+            <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeCreateModal()">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <form [formGroup]="createForm" (ngSubmit)="createCompany()">
             <label>
               Nombre
@@ -149,18 +218,26 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
                 <option value="CNY">CNY</option>
               </select>
             </label>
-            <div class="modal-actions">
-              <button class="btn btn-outline" type="button" (click)="closeCreateModal()">Cancelar</button>
+            <div class="modal-actions modal-actions--end">
               <button class="btn btn-primary" type="submit" [disabled]="createForm.invalid || loading()">Crear</button>
             </div>
           </form>
         </div>
       </dialog>
 
-      <dialog #joinDialog class="modal" (cancel)="$event.preventDefault()">
+      <dialog #joinDialog class="modal" (click)="closeDialogOnBackdropClick($event, closeJoinModal.bind(this))">
         <div class="modal-inner">
-          <p class="modal-eyebrow">Acceso existente</p>
-          <h2 class="modal-title">Unirse a empresa</h2>
+          <div class="modal-head-bar">
+            <div class="modal-head-bar__main">
+              <p class="modal-eyebrow">Acceso existente</p>
+              <h2 class="modal-title">Unirse a empresa</h2>
+            </div>
+            <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeJoinModal()">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <form [formGroup]="joinForm" (ngSubmit)="joinCompany()">
             <label>
               Nombre
@@ -170,78 +247,163 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
               Contraseña
               <input type="password" formControlName="password" />
             </label>
-            <div class="modal-actions">
-              <button class="btn btn-outline" type="button" (click)="closeJoinModal()">Cancelar</button>
+            <div class="modal-actions modal-actions--end">
               <button class="btn btn-primary" type="submit" [disabled]="joinForm.invalid || loading()">Unirme</button>
             </div>
           </form>
         </div>
       </dialog>
 
-      <dialog #membersDialog class="modal" (cancel)="$event.preventDefault()">
-        <div class="modal-inner">
-          @if (companyPage(); as page) {
-            <h2 class="modal-title">
-              Miembros de <span class="accent">{{ page.company.name }}</span>
-            </h2>
-            <p class="modal-subtitle">Gestiona los miembros de tu organización.</p>
-            <div class="members-list">
-              <ul>
-                @for (m of page.members; track m.userId) {
-                  <li>
-                    <span class="member-avatar" aria-hidden="true">{{ m.name.slice(0, 1).toUpperCase() }}</span>
-                    <span class="member-main">
-                      <span class="member-name">{{ m.name }}</span>
-                      @if (m.email === currentEmail()) {
-                        <span class="meta-you">(Tú)</span>
-                      }
-                    </span>
-                    @if (page.company.role === 'company_admin') {
-                      <label class="member-role-select">
-                        <span class="sr-only">Rol de {{ m.name }}</span>
-                        <select
-                          [value]="m.role"
-                          [disabled]="updatingMemberRoleUserId() === m.userId || loading() || isSoleOwner(m, page.members)"
-                          [title]="isSoleOwner(m, page.members) ? 'Debe haber al menos un propietario' : null"
-                          (change)="changeMemberRole(m, page.members, $any($event.target).value)"
-                        >
-                          <option value="employee">{{ roleLabel('employee') }}</option>
-                          <option value="analytics_viewer">{{ roleLabel('analytics_viewer') }}</option>
-                          <option value="company_admin">{{ roleLabel('company_admin') }}</option>
-                        </select>
-                      </label>
-                    } @else {
-                      <span class="member-role-readonly">{{ roleLabel(m.role) }}</span>
-                    }
-                  </li>
-                }
-                @for (i of pendingInvitations(); track i.id) {
-                  <li>
-                    <span class="member-avatar member-avatar--pending" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" width="16" height="16">
-                        <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                      </svg>
-                    </span>
-                    <span class="member-main">
-                      <span class="member-name">{{ i.email }}</span>
-                      <span class="meta">(Invitado - {{ i.role }})</span>
-                    </span>
-                  </li>
-                }
-              </ul>
+      <dialog #editDialog class="modal modal--company-edit" (click)="closeDialogOnBackdropClick($event, closeEditDialog.bind(this))">
+        <div class="modal-inner modal-inner--company-edit">
+          <header class="company-edit-head modal-head-bar">
+            <div class="modal-head-bar__main">
+              <p class="modal-eyebrow">Espacio de trabajo</p>
+              <h3 class="modal-title">Editar empresa</h3>
             </div>
-          }
-          <div class="modal-actions">
-            <button class="btn btn-outline" type="button" (click)="closeMembersModal()">Cerrar</button>
+            <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeEditDialog()">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </header>
+
+          <div class="company-edit-scroll">
+            <form
+              id="company-settings-form"
+              class="company-edit-form"
+              [formGroup]="settingsForm"
+              (ngSubmit)="onSaveSettings()"
+            >
+              <section class="ce-section" aria-labelledby="ce-info-title">
+                <div class="ce-section-head">
+                  <span class="ce-section-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M4 21V7l8-4 8 4v14M9 21V11h6v10" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h4 id="ce-info-title" class="ce-section-title">Información del espacio</h4>
+                  </div>
+                </div>
+                <label class="ce-field ce-field--full">
+                  <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
+                  <input
+                    type="text"
+                    class="ce-input"
+                    formControlName="name"
+                    autocomplete="organization"
+                    placeholder="Nombre de la empresa"
+                  />
+                </label>
+                <label class="ce-field">
+                  <span class="field-label">Moneda <span class="required-mark" aria-hidden="true">*</span></span>
+                  <select class="ce-input ce-input--select" formControlName="currency">
+                    @for (c of currencyOptions; track c) {
+                      <option [value]="c">{{ currencyLabel(c) }} ({{ c }})</option>
+                    }
+                  </select>
+                </label>
+                @if (settingsFeedback()) {
+                  <p
+                    class="ce-feedback"
+                    [class.ce-feedback--error]="settingsFeedback()!.kind === 'error'"
+                    [class.ce-feedback--ok]="settingsFeedback()!.kind === 'ok'"
+                    role="alert"
+                  >
+                    {{ settingsFeedback()!.text }}
+                  </p>
+                }
+                <div class="ce-settings-actions">
+                  <button
+                    type="submit"
+                    class="btn-submit"
+                    [disabled]="settingsForm.invalid || savingSettings()"
+                  >
+                    {{ savingSettings() ? 'Guardando…' : 'Guardar cambios' }}
+                  </button>
+                </div>
+              </section>
+            </form>
+
+            <form
+              id="company-password-form"
+              class="company-edit-form"
+              [formGroup]="passwordForm"
+              (ngSubmit)="onChangeCompanyPassword()"
+            >
+              <section class="ce-section ce-section--accent" aria-labelledby="ce-pass-title">
+                <div class="ce-section-head">
+                  <span class="ce-section-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 11V7a4 4 0 1 0-8 0v4M5 11h14v10H5V11z" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h4 id="ce-pass-title" class="ce-section-title">Contraseña de acceso</h4>
+                  </div>
+                </div>
+                <div class="ce-metrics">
+                  <label class="ce-field">
+                    <span class="field-label">Contraseña actual <span class="required-mark" aria-hidden="true">*</span></span>
+                    <input
+                      type="password"
+                      class="ce-input"
+                      formControlName="currentPassword"
+                      autocomplete="current-password"
+                      placeholder="••••••••"
+                    />
+                  </label>
+                  <label class="ce-field">
+                    <span class="field-label">Nueva contraseña <span class="required-mark" aria-hidden="true">*</span></span>
+                    <input
+                      type="password"
+                      class="ce-input"
+                      formControlName="newPassword"
+                      autocomplete="new-password"
+                      placeholder="Mínimo 8 caracteres"
+                    />
+                  </label>
+                </div>
+                @if (passwordFeedback()) {
+                  <p
+                    class="ce-feedback"
+                    [class.ce-feedback--error]="passwordFeedback()!.kind === 'error'"
+                    [class.ce-feedback--ok]="passwordFeedback()!.kind === 'ok'"
+                    role="alert"
+                  >
+                    {{ passwordFeedback()!.text }}
+                  </p>
+                }
+                <div class="ce-settings-actions">
+                  <button
+                    type="submit"
+                    class="btn-secondary btn-secondary--outline"
+                    [disabled]="passwordForm.invalid || savingPassword()"
+                  >
+                    {{ savingPassword() ? 'Actualizando…' : 'Actualizar contraseña' }}
+                  </button>
+                </div>
+              </section>
+            </form>
           </div>
         </div>
       </dialog>
 
-      <dialog #inviteDialog class="modal" (cancel)="$event.preventDefault()">
+      <dialog #inviteDialog class="modal" (click)="closeDialogOnBackdropClick($event, closeInviteModal.bind(this))">
         <div class="modal-inner">
-          <p class="modal-eyebrow">Invitación</p>
-          <h2 class="modal-title">Invitar miembro</h2>
-          <p class="modal-subtitle">Envía invitaciones por correo asignando rol.</p>
+          <div class="modal-head-bar">
+            <div class="modal-head-bar__main">
+              <p class="modal-eyebrow">Invitación</p>
+              <h2 class="modal-title">Invitar miembro</h2>
+              <p class="modal-subtitle">Envía invitaciones por correo asignando rol.</p>
+            </div>
+            <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeInviteModal()">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <form [formGroup]="inviteForm" (ngSubmit)="invite()">
             <label>
               Email
@@ -250,13 +412,12 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
             <label>
               Rol
               <select formControlName="role">
-                <option value="employee">employee</option>
-                <option value="analytics_viewer">analytics_viewer</option>
-                <option value="company_admin">company_admin</option>
+                <option value="employee">{{ roleLabel('employee') }}</option>
+                <option value="analytics_viewer">{{ roleLabel('analytics_viewer') }}</option>
+                <option value="company_admin">{{ roleLabel('company_admin') }}</option>
               </select>
             </label>
-            <div class="modal-actions">
-              <button class="btn btn-outline" type="button" (click)="closeInviteModal()">Cerrar</button>
+            <div class="modal-actions modal-actions--end">
               <button class="btn btn-primary" type="submit" [disabled]="inviteForm.invalid || loading()">
                 Enviar invitación
               </button>
@@ -269,6 +430,16 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
   styles: `
     :host {
       display: block;
+      --inv-cta: var(--story-primary);
+      --inv-cta-hover: var(--story-primary-hover);
+      --inv-text: #0f172a;
+      --inv-text-soft: #334155;
+      --inv-muted: #64748b;
+      --inv-border: #e2e8f0;
+      --inv-border-strong: #cbd5e1;
+      --inv-surface: #ffffff;
+      --inv-danger: var(--story-danger);
+      --inv-focus-ring: 0 0 0 3px var(--story-focus-ring);
     }
 
     .company-page {
@@ -307,10 +478,8 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
 
     .company-hero {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1.25rem;
+      flex-direction: column;
+      gap: 1.1rem;
       padding: 1.6rem;
       background: #ffffff;
       border: 1px solid var(--story-border);
@@ -318,11 +487,11 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 10px 28px rgba(15, 23, 42, 0.05);
     }
 
-    .company-hero-main {
+    .company-hero-top {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
+      justify-content: space-between;
       gap: 1rem;
-      min-width: min(100%, 22rem);
     }
 
     .company-copy {
@@ -371,9 +540,66 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       color: var(--story-accent-muted);
     }
 
-    .role-note {
-      color: #475569;
+    .meta-currency {
+      font-size: 0.82rem;
+      color: var(--story-text-muted);
+      font-weight: 500;
+    }
+
+    .co-more-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .co-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      border: 1px solid var(--story-border);
+      border-radius: 12px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+
+    .co-icon-btn:hover {
+      background: #f8fafc;
+      border-color: var(--story-border-strong);
+    }
+
+    .co-more-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      min-width: 13rem;
+      padding: 0.4rem;
+      background: #fff;
+      border: 1px solid var(--story-border);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 0 1px rgba(15, 23, 42, 0.08);
+      z-index: 80;
+    }
+
+    .co-more-item {
+      display: block;
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
       font-size: 0.88rem;
+      text-align: left;
+      cursor: pointer;
+      color: #0f172a;
+      transition: background 0.12s ease;
+    }
+
+    .co-more-item:hover {
+      background: #f1f5f9;
     }
 
     .actions-row {
@@ -389,59 +615,118 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       border-radius: 14px;
     }
 
-    .company-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-      gap: 0.75rem;
-      margin: 1rem 0 0;
+    .members-section {
+      margin-top: 1.25rem;
     }
 
-    .stat-card {
+    .members-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .members-header h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    .members-count {
+      font-size: 0.82rem;
+      color: var(--story-text-muted);
+      font-weight: 500;
+    }
+
+    .members-panel {
+      border: 1px solid var(--story-border);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+    }
+
+    .members-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .member-row {
       display: flex;
       align-items: center;
       gap: 0.85rem;
-      padding: 0.9rem 1rem;
-      background: var(--story-surface);
-      border: 1px solid var(--story-border);
-      border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-      transition: border-color 0.18s ease, transform 0.18s ease;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--story-border);
     }
 
-    .stat-card:hover {
-      border-color: var(--story-border-strong);
-      transform: translateY(-1px);
+    .member-row:last-child {
+      border-bottom: none;
     }
 
-    .stat-icon {
-      width: 2.35rem;
-      height: 2.35rem;
-      display: inline-flex;
+    .member-row--pending {
+      background: #fafbfc;
+    }
+
+    .member-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      justify-content: center;
-      border-radius: 11px;
+      gap: 0.35rem 0.65rem;
+    }
+
+    .member-name {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.92rem;
+    }
+
+    .member-email {
+      width: 100%;
+      font-size: 0.8rem;
+      color: var(--story-text-muted);
+      overflow-wrap: anywhere;
+    }
+
+    .member-row--pending .member-email {
+      width: auto;
+    }
+
+    .member-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
       flex-shrink: 0;
     }
 
-    .stat-icon--blue { background: rgba(30, 64, 175, 0.10); color: var(--story-primary); }
-    .stat-icon--amber { background: rgba(245, 158, 11, 0.14); color: var(--story-accent-muted); }
-    .stat-icon--green { background: rgba(21, 128, 61, 0.10); color: var(--story-success); }
-
-    .stat-label {
-      display: block;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--story-text-muted);
+    .member-remove-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border: 1px solid rgba(185, 28, 28, 0.2);
+      border-radius: 10px;
+      background: rgba(185, 28, 28, 0.06);
+      color: var(--story-danger);
+      cursor: pointer;
+      transition: background 0.12s ease;
     }
 
-    .stat-value {
-      display: block;
-      margin-top: 0.1rem;
-      font-size: 1.2rem;
-      letter-spacing: -0.015em;
-      color: #0f172a;
+    .member-remove-btn:hover:not(:disabled) {
+      background: rgba(185, 28, 28, 0.12);
+    }
+
+    .member-remove-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .empty-state {
@@ -611,27 +896,49 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
     .modal {
       border: none;
       border-radius: 16px;
-      width: min(100%, 530px);
       padding: 0;
+      max-width: 26rem;
+      width: calc(100vw - 2rem);
       box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
+    }
+
+    .modal--company-edit {
+      max-width: min(34rem, calc(100vw - 1.5rem));
     }
 
     .modal::backdrop {
       background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(4px);
     }
 
     .modal-inner {
-      padding: 1.35rem 1.5rem 1.25rem;
-      background: var(--story-surface);
-      color: var(--story-text);
+      padding: 1.35rem;
+      background: var(--inv-surface);
       border-radius: 16px;
     }
 
+    .modal-inner--company-edit {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: min(90vh, 52rem);
+      overflow: hidden;
+    }
+
+    .company-edit-head {
+      padding: 1.15rem 1.5rem 0.65rem;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--inv-border);
+    }
+
+    .modal-actions--end {
+      justify-content: flex-end;
+    }
+
     .modal-eyebrow {
-      margin: 0 0 0.25rem;
-      color: var(--story-primary);
-      font-size: 0.7rem;
+      margin: 0 0 0.2rem;
+      color: var(--inv-cta);
+      font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -639,10 +946,227 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
 
     .modal-title {
       margin: 0;
-      font-size: 1.18rem;
+      font-size: 1.22rem;
       font-weight: 700;
       letter-spacing: -0.02em;
-      color: #0f172a;
+      color: var(--inv-text);
+    }
+
+    .company-edit-scroll {
+      overflow-y: auto;
+      padding: 1rem 1.5rem 1.25rem;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .company-edit-form {
+      display: block;
+    }
+
+    .ce-section {
+      padding: 0 0 1.1rem;
+      margin-bottom: 1.1rem;
+      border-bottom: 1px solid var(--inv-border);
+    }
+
+    .ce-section:not(.ce-section--accent):last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0.25rem;
+    }
+
+    .ce-section--accent {
+      padding: 0.85rem 1rem 1rem;
+      margin-bottom: 0;
+      border: 1px solid var(--inv-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    .ce-section-head {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      margin-bottom: 0.85rem;
+    }
+
+    .ce-section-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 8px;
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--inv-cta);
+      flex-shrink: 0;
+    }
+
+    .ce-section-title {
+      margin: 0;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--inv-text);
+    }
+
+    .ce-section-hint {
+      margin: 0.15rem 0 0;
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--inv-muted);
+      line-height: 1.4;
+    }
+
+    .ce-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+
+    .ce-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+      min-width: 0;
+    }
+
+    .ce-field--full {
+      margin-bottom: 0.65rem;
+    }
+
+    .field-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--inv-text-soft);
+    }
+
+    .required-mark {
+      color: var(--inv-danger);
+    }
+
+    .ce-input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
+      font: inherit;
+      background: #ffffff;
+      color: var(--inv-text);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .ce-input--select {
+      cursor: pointer;
+    }
+
+    .ce-input:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
+    }
+
+    .ce-feedback {
+      margin: 0.75rem 0 0;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.85rem;
+      border-radius: 8px;
+    }
+
+    .ce-feedback--ok {
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    .ce-feedback--error {
+      background: #fce8e6;
+      color: #c5221f;
+    }
+
+    .ce-settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.85rem;
+      padding-top: 0.15rem;
+    }
+
+    .btn-secondary {
+      padding: 0.6rem 1.05rem;
+      border-radius: 10px;
+      border: 1px solid var(--inv-border-strong);
+      background: #ffffff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: var(--inv-text-soft);
+      transition: border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+
+    .btn-secondary--outline {
+      color: var(--inv-cta);
+      border-color: rgba(30, 64, 175, 0.35);
+      background: rgba(30, 64, 175, 0.04);
+    }
+
+    .btn-secondary--outline:hover:not(:disabled) {
+      background: rgba(30, 64, 175, 0.08);
+      border-color: var(--inv-cta);
+    }
+
+    .btn-secondary:disabled,
+    .btn-submit:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-submit {
+      padding: 0.6rem 1.1rem;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
+      background: var(--inv-cta);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.22);
+      transition: background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--inv-cta-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
+    }
+
+    .btn-submit:focus-visible {
+      outline: none;
+      box-shadow: var(--inv-focus-ring);
+    }
+
+    @media (max-width: 520px) {
+      .ce-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .company-edit-head,
+      .company-edit-scroll {
+        padding-left: 1.1rem;
+        padding-right: 1.1rem;
+      }
+
+      .ce-settings-actions .btn-secondary,
+      .ce-settings-actions .btn-submit {
+        width: 100%;
+      }
     }
 
     .modal-subtitle {
@@ -657,38 +1181,7 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       font-weight: 700;
     }
 
-    .members-list {
-      border: 1px solid var(--story-border);
-      border-radius: 14px;
-      max-height: 320px;
-      overflow: auto;
-      padding: 0.45rem;
-      margin: 0.4rem 0 1rem;
-      background: #f8fafc;
-    }
-
-    .members-list ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .members-list li {
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
-      padding: 0.65rem 0.7rem;
-      border-radius: 10px;
-      background: #ffffff;
-      border: 1px solid var(--story-border);
-      font-size: 0.9rem;
-    }
-
     .member-role-select {
-      margin-left: auto;
       flex-shrink: 0;
     }
 
@@ -706,7 +1199,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
     }
 
     .member-role-readonly {
-      margin-left: auto;
       flex-shrink: 0;
       font-size: 0.78rem;
       font-weight: 600;
@@ -743,22 +1235,6 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
       color: var(--story-accent-muted);
     }
 
-    .member-main {
-      min-width: 0;
-    }
-
-    .member-name {
-      color: #0f172a;
-      font-weight: 600;
-      overflow-wrap: anywhere;
-    }
-
-    .meta {
-      color: var(--story-text-muted);
-      font-size: 0.75rem;
-      margin-left: 0.35rem;
-    }
-
     .meta-you {
       display: inline-flex;
       margin-left: 0.35rem;
@@ -782,8 +1258,18 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
         padding: 1.35rem;
       }
 
-      .company-hero-main {
-        align-items: flex-start;
+      .company-hero-top {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .member-row {
+        flex-wrap: wrap;
+      }
+
+      .member-actions {
+        width: 100%;
+        justify-content: flex-end;
       }
 
       .actions-row {
@@ -801,18 +1287,28 @@ import { CompanyPageDto, CompanyRole, CompanyMemberDto } from '../../core/models
   `,
 })
 export class CompanyComponent {
+  protected readonly closeDialogOnBackdropClick = closeDialogOnBackdropClick;
   private readonly companyApi = inject(CompanyApiService);
   private readonly accountApi = inject(AccountApiService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
-  private readonly membersDialogRef = viewChild<ElementRef<HTMLDialogElement>>('membersDialog');
+  private readonly moreRootRef = viewChild<ElementRef<HTMLElement>>('moreRoot');
+  private readonly editDialogRef = viewChild<ElementRef<HTMLDialogElement>>('editDialog');
   private readonly inviteDialogRef = viewChild<ElementRef<HTMLDialogElement>>('inviteDialog');
   private readonly createDialogRef = viewChild<ElementRef<HTMLDialogElement>>('createDialog');
   private readonly joinDialogRef = viewChild<ElementRef<HTMLDialogElement>>('joinDialog');
 
+  protected readonly currencyOptions: CompanyCurrency[] = ['EUR', 'USD', 'JPY', 'CNY'];
+  protected readonly moreMenuOpen = signal(false);
+
   protected readonly loading = signal(false);
   protected readonly updatingMemberRoleUserId = signal<number | null>(null);
+  protected readonly removingMemberUserId = signal<number | null>(null);
+  protected readonly savingSettings = signal(false);
+  protected readonly savingPassword = signal(false);
+  protected readonly settingsFeedback = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  protected readonly passwordFeedback = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
   protected readonly error = signal('');
   protected readonly success = signal('');
   protected readonly companyPage = signal<CompanyPageDto | null>(null);
@@ -833,6 +1329,16 @@ export class CompanyComponent {
     role: ['employee' as CompanyRole, Validators.required],
   });
 
+  protected readonly settingsForm = this.fb.nonNullable.group({
+    name: ['', [Validators.required, Validators.minLength(3)]],
+    currency: ['EUR' as CompanyCurrency, Validators.required],
+  });
+
+  protected readonly passwordForm = this.fb.nonNullable.group({
+    currentPassword: ['', [Validators.required, Validators.minLength(8)]],
+    newPassword: ['', [Validators.required, Validators.minLength(8)]],
+  });
+
   protected pendingInvitations() {
     const page = this.companyPage();
     if (!page) return [];
@@ -843,15 +1349,154 @@ export class CompanyComponent {
     return this.auth.currentUser()?.email ?? '';
   }
 
-  protected roleLabel(role: CompanyRole): string {
-    switch (role) {
-      case 'company_admin':
-        return 'Propietario';
-      case 'analytics_viewer':
-        return 'Analítica';
+  /** Rol en sesión (misma fuente que /productos y estadisticasGuard). */
+  protected readonly roleLabel = roleLabel;
+
+  protected currentCompanyRole(): CompanyRole | null {
+    return this.auth.currentUser()?.companyRole ?? null;
+  }
+
+  protected isCompanyAdmin(): boolean {
+    return checkCompanyAdmin(this.currentCompanyRole());
+  }
+
+  protected currencyLabel(currency: CompanyCurrency): string {
+    switch (currency) {
+      case 'USD':
+        return 'Dólar';
+      case 'JPY':
+        return 'Yen';
+      case 'CNY':
+        return 'Yuan';
       default:
-        return 'Empleado';
+        return 'Euro';
     }
+  }
+
+  protected canRemoveMember(member: CompanyMemberDto, members: CompanyMemberDto[]): boolean {
+    if (!this.isCompanyAdmin()) return false;
+    if (member.email === this.currentEmail()) return false;
+    if (this.isSoleOwner(member, members)) return false;
+    return true;
+  }
+
+  protected removeMember(member: CompanyMemberDto): void {
+    if (!this.canRemoveMember(member, this.companyPage()?.members ?? [])) return;
+    if (!globalThis.confirm(`¿Eliminar a ${member.name} de la empresa?`)) return;
+    this.removingMemberUserId.set(member.userId);
+    this.error.set('');
+    this.success.set('');
+    this.companyApi
+      .removeMember(member.userId)
+      .pipe(switchMap(() => this.refreshPageObservable()))
+      .subscribe({
+        next: () => {
+          this.removingMemberUserId.set(null);
+          this.success.set(`${member.name} eliminado de la empresa.`);
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.removingMemberUserId.set(null);
+          this.error.set(err?.error?.message ?? 'No se pudo eliminar el miembro.');
+          this.refreshPage();
+        },
+      });
+  }
+
+  protected toggleMoreMenu(ev: Event): void {
+    ev.stopPropagation();
+    this.moreMenuOpen.update((o) => !o);
+  }
+
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(ev: MouseEvent): void {
+    const moreRoot = this.moreRootRef()?.nativeElement;
+    if (!moreRoot?.contains(ev.target as Node) && this.moreMenuOpen()) {
+      this.moreMenuOpen.set(false);
+    }
+  }
+
+  protected openEditDialog(): void {
+    this.moreMenuOpen.set(false);
+    const page = this.companyPage();
+    if (page) {
+      this.settingsForm.patchValue({
+        name: page.company.name,
+        currency: page.company.currency,
+      });
+    }
+    this.settingsFeedback.set(null);
+    this.passwordFeedback.set(null);
+    this.passwordForm.reset({ currentPassword: '', newPassword: '' });
+    this.editDialogRef()?.nativeElement.showModal();
+  }
+
+  protected closeEditDialog(): void {
+    this.editDialogRef()?.nativeElement.close();
+  }
+
+  protected onSaveSettings(): void {
+    if (!this.isCompanyAdmin() || this.settingsForm.invalid) return;
+    const page = this.companyPage();
+    if (!page) return;
+
+    const { name, currency } = this.settingsForm.getRawValue();
+    const trimmedName = name.trim();
+    const nameChanged = trimmedName !== page.company.name;
+    const currencyChanged = currency !== page.company.currency;
+    if (!nameChanged && !currencyChanged) {
+      this.settingsFeedback.set({ kind: 'ok', text: 'No hay cambios que guardar.' });
+      return;
+    }
+
+    const updates: Observable<unknown>[] = [];
+    if (nameChanged) {
+      updates.push(this.companyApi.updateName({ name: trimmedName }));
+    }
+    if (currencyChanged) {
+      updates.push(this.companyApi.updateCurrency({ currency }));
+    }
+
+    this.settingsFeedback.set(null);
+    this.savingSettings.set(true);
+    forkJoin(updates)
+      .pipe(switchMap(() => this.refreshUserAndPage()))
+      .subscribe({
+        next: () => {
+          this.savingSettings.set(false);
+          this.settingsFeedback.set({ kind: 'ok', text: 'Cambios guardados.' });
+          this.success.set('Empresa actualizada.');
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.savingSettings.set(false);
+          this.settingsFeedback.set({
+            kind: 'error',
+            text: err?.error?.message ?? 'No se pudieron guardar los cambios.',
+          });
+        },
+      });
+  }
+
+  protected onChangeCompanyPassword(): void {
+    if (!this.isCompanyAdmin() || this.passwordForm.invalid) return;
+    this.passwordFeedback.set(null);
+    this.savingPassword.set(true);
+    this.companyApi
+      .updatePassword(this.passwordForm.getRawValue())
+      .pipe(switchMap(() => this.refreshUserAndPage()))
+      .subscribe({
+        next: () => {
+          this.savingPassword.set(false);
+          this.passwordForm.reset({ currentPassword: '', newPassword: '' });
+          this.passwordFeedback.set({ kind: 'ok', text: 'Contraseña actualizada.' });
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.savingPassword.set(false);
+          this.passwordFeedback.set({
+            kind: 'error',
+            text: err?.error?.message ?? 'No se pudo cambiar la contraseña.',
+          });
+        },
+      });
   }
 
   protected ownerCount(members: CompanyMemberDto[]): number {
@@ -1002,14 +1647,6 @@ export class CompanyComponent {
           this.error.set(err?.error?.message ?? 'No se pudo enviar la invitacion.');
         },
       });
-  }
-
-  protected openMembersModal(): void {
-    this.membersDialogRef()?.nativeElement.showModal();
-  }
-
-  protected closeMembersModal(): void {
-    this.membersDialogRef()?.nativeElement.close();
   }
 
   protected openInviteModal(): void {

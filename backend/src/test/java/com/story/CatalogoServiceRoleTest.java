@@ -8,6 +8,7 @@ import com.story.model.Usuario;
 import com.story.repository.CategoriaRepository;
 import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
+import com.story.security.CompanyAdminMessages;
 import com.story.service.CatalogoService;
 import com.story.service.CurrentUserService;
 import com.story.service.FileStorageService;
@@ -57,7 +58,10 @@ class CatalogoServiceRoleTest {
 
     @Test
     void eliminarProducto_employeeRole_forbidden() {
-        when(currentUserService.requireCurrentCompanyRole()).thenReturn(CompanyRole.employee);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                CompanyAdminMessages.DELETE_PRODUCT
+        )).when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.DELETE_PRODUCT);
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
@@ -107,7 +111,7 @@ class CatalogoServiceRoleTest {
     @Test
     void eliminarProducto_adminRole_allowsDelete() {
         Producto producto = buildProducto();
-        when(currentUserService.requireCurrentCompanyRole()).thenReturn(CompanyRole.company_admin);
+        org.mockito.Mockito.doNothing().when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.DELETE_PRODUCT);
         when(currentUserService.requireCurrentCompanyId()).thenReturn(1L);
         when(productoRepository.findByIdAndCompany_Id(1L, 1L)).thenReturn(Optional.of(producto));
 

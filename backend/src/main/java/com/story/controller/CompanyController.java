@@ -8,14 +8,20 @@ import com.story.model.company.CreateCompanyRequest;
 import com.story.model.company.CompanyInvitationDto;
 import com.story.model.company.InviteCompanyMemberRequest;
 import com.story.model.company.JoinCompanyRequest;
+import com.story.model.company.UpdateCompanyCurrencyRequest;
 import com.story.model.company.UpdateCompanyMemberRoleRequest;
+import com.story.model.company.UpdateCompanyNameRequest;
+import com.story.model.company.UpdateCompanyPasswordRequest;
+import com.story.service.CompanyMemberService;
 import com.story.service.CompanyService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -28,9 +34,11 @@ import java.util.List;
 public class CompanyController {
 
     private final CompanyService companyService;
+    private final CompanyMemberService companyMemberService;
 
-    public CompanyController(CompanyService companyService) {
+    public CompanyController(CompanyService companyService, CompanyMemberService companyMemberService) {
         this.companyService = companyService;
+        this.companyMemberService = companyMemberService;
     }
 
     @PostMapping("/create")
@@ -53,12 +61,12 @@ public class CompanyController {
     @PostMapping("/invitations")
     @ResponseStatus(HttpStatus.CREATED)
     public CompanyInvitationDto invite(@Valid @RequestBody InviteCompanyMemberRequest request) {
-        return companyService.invite(request);
+        return companyMemberService.invite(request);
     }
 
     @PostMapping("/invitations/accept")
     public CompanySummaryDto accept(@Valid @RequestBody AcceptInvitationRequest request) {
-        return companyService.acceptInvitation(request.token());
+        return companyMemberService.acceptInvitation(request.token());
     }
 
     @GetMapping("/me")
@@ -73,7 +81,28 @@ public class CompanyController {
 
     @GetMapping("/members")
     public List<CompanyMemberDto> members() {
-        return companyService.getCurrentCompanyPage().members();
+        return companyMemberService.listMembersForCurrentCompany();
+    }
+
+    @PutMapping("/currency")
+    public CompanySummaryDto updateCurrency(@Valid @RequestBody UpdateCompanyCurrencyRequest request) {
+        return companyService.updateCurrency(request);
+    }
+
+    @PutMapping("/name")
+    public CompanySummaryDto updateName(@Valid @RequestBody UpdateCompanyNameRequest request) {
+        return companyService.updateName(request);
+    }
+
+    @PutMapping("/password")
+    public CompanySummaryDto updatePassword(@Valid @RequestBody UpdateCompanyPasswordRequest request) {
+        return companyService.updatePassword(request);
+    }
+
+    @DeleteMapping("/members/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeMember(@PathVariable Long userId) {
+        companyMemberService.removeMember(userId);
     }
 
     @PatchMapping("/members/{userId}/role")
@@ -81,11 +110,11 @@ public class CompanyController {
             @PathVariable Long userId,
             @Valid @RequestBody UpdateCompanyMemberRoleRequest request
     ) {
-        return companyService.updateMemberRole(userId, request);
+        return companyMemberService.updateMemberRole(userId, request);
     }
 
     @GetMapping("/invitations")
     public List<CompanyInvitationDto> invitations() {
-        return companyService.getCurrentCompanyPage().invitations();
+        return companyMemberService.listInvitationsForCurrentCompany();
     }
 }

@@ -2,12 +2,12 @@ package com.story;
 
 import com.story.model.Company;
 import com.story.model.CompanyCurrency;
-import com.story.model.CompanyRole;
 import com.story.model.Producto;
 import com.story.model.ProductoCarpeta;
 import com.story.model.Usuario;
 import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
+import com.story.security.CompanyAdminMessages;
 import com.story.service.CarpetaService;
 import com.story.service.CatalogoService;
 import com.story.service.CurrentUserService;
@@ -74,7 +74,7 @@ class CarpetaServiceTest {
         Producto p = producto(99L, company);
         p.setCarpeta(folder);
 
-        when(currentUserService.requireCurrentCompanyRole()).thenReturn(CompanyRole.company_admin);
+        doNothing().when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.DELETE_FOLDER);
         when(currentUserService.requireCurrentCompanyId()).thenReturn(1L);
         when(productoCarpetaRepository.findByIdAndCompany_Id(5L, 1L)).thenReturn(Optional.of(folder));
         when(productoCarpetaRepository.findAllByCompany_IdAndParent_IdOrderByNombreAsc(1L, 5L))

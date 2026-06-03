@@ -43,7 +43,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
         <button type="submit" class="rm-submit" [disabled]="form.invalid || submitting()">
           {{ submitting() ? 'Guardando…' : 'Registrar' }}
         </button>
-        <button type="button" class="rm-cancel" (click)="onCancel()">Cerrar</button>
       </div>
     </form>
   `,
@@ -88,8 +87,7 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       gap: 0.5rem;
       margin-top: 0.25rem;
     }
-    .rm-submit,
-    .rm-cancel {
+    .rm-submit {
       padding: 0.45rem 1rem;
       font: inherit;
       font-size: 0.86rem;
@@ -97,8 +95,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.15s ease, border-color 0.15s ease;
-    }
-    .rm-submit {
       border: none;
       background: var(--story-primary, #1e40af);
       color: var(--story-on-primary, #fff);
@@ -109,14 +105,6 @@ import { CatalogoApiService } from '../../core/services/catalogo-api.service';
     .rm-submit:disabled {
       opacity: 0.55;
       cursor: not-allowed;
-    }
-    .rm-cancel {
-      border: 1px solid var(--story-border, #e2e8f0);
-      background: var(--story-bg-page, #f8fafc);
-      color: var(--story-text, #1e293b);
-    }
-    .rm-cancel:hover {
-      background: var(--story-surface, #fff);
     }
   `,
 })

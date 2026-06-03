@@ -249,7 +249,7 @@ interface PeriodoPresetOption {
             </span>
             <div>
               <span class="kpi-label">Valor inventario</span>
-              <span class="kpi-value">{{ d.valorInventarioTotal | currency: companyCurrency() }}</span>
+              <span class="kpi-value">{{ d.valorInventarioTotal | currency: auth.companyCurrency() }}</span>
             </div>
           </article>
           <article class="kpi">
@@ -343,7 +343,7 @@ interface PeriodoPresetOption {
                 >
                   <div class="pie-center">
                     <span class="pie-center-label">Total</span>
-                    <strong class="pie-center-value">{{ valorMovimientoTotal(d) | currency: companyCurrency() }}</strong>
+                    <strong class="pie-center-value">{{ valorMovimientoTotal(d) | currency: auth.companyCurrency() }}</strong>
                   </div>
                 </div>
                 <ul class="pie-legend">
@@ -351,7 +351,7 @@ interface PeriodoPresetOption {
                     <span class="pie-legend-dot in"></span>
                     <span class="pie-legend-text">
                       <span>Entradas</span>
-                      <strong>{{ valorNum(d.valorEntrada) | currency: companyCurrency() }}</strong>
+                      <strong>{{ valorNum(d.valorEntrada) | currency: auth.companyCurrency() }}</strong>
                       <em>{{ pctValor(d.valorEntrada, d) }}%</em>
                     </span>
                   </li>
@@ -359,7 +359,7 @@ interface PeriodoPresetOption {
                     <span class="pie-legend-dot out"></span>
                     <span class="pie-legend-text">
                       <span>Salidas</span>
-                      <strong>{{ valorNum(d.valorSalida) | currency: companyCurrency() }}</strong>
+                      <strong>{{ valorNum(d.valorSalida) | currency: auth.companyCurrency() }}</strong>
                       <em>{{ pctValor(d.valorSalida, d) }}%</em>
                     </span>
                   </li>
@@ -367,7 +367,7 @@ interface PeriodoPresetOption {
                     <span class="pie-legend-dot adj"></span>
                     <span class="pie-legend-text">
                       <span>Ajustes</span>
-                      <strong>{{ valorNum(d.valorAjuste) | currency: companyCurrency() }}</strong>
+                      <strong>{{ valorNum(d.valorAjuste) | currency: auth.companyCurrency() }}</strong>
                       <em>{{ pctValor(d.valorAjuste, d) }}%</em>
                     </span>
                   </li>
@@ -1251,7 +1251,7 @@ interface PeriodoPresetOption {
 })
 export class EstadisticasComponent implements OnInit {
   private readonly api = inject(CatalogoApiService);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly maxUnidadesEnSerie = signal(1);
@@ -1469,10 +1469,6 @@ export class EstadisticasComponent implements OnInit {
     return Math.max(unidades > 0 ? 4 : 0, (unidades / this.maxUnidadesEnSerie()) * 100);
   }
 
-  protected companyCurrency(): string {
-    return this.auth.currentUser()?.companyCurrency ?? 'EUR';
-  }
-
   protected balanceNeto(d: InventarioEstadisticasDto): number {
     return d.unidadesEntrada - d.unidadesSalida;
   }
@@ -1511,7 +1507,7 @@ export class EstadisticasComponent implements OnInit {
   }
 
   protected pieAriaLabel(d: InventarioEstadisticasDto): string {
-    const currency = this.companyCurrency();
+    const currency = this.auth.companyCurrency();
     return `Entradas ${this.pctValor(d.valorEntrada, d)} por ciento, salidas ${this.pctValor(d.valorSalida, d)} por ciento, ajustes ${this.pctValor(d.valorAjuste, d)} por ciento. Total en ${currency}.`;
   }
 }

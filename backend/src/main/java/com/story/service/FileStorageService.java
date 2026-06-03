@@ -129,6 +129,20 @@ public class FileStorageService {
 
     /**
      * Duplica el fichero con un nuevo nombre y devuelve la nueva URL pública, o {@code null} si no hay origen.
+     * Las URLs externas (p. ej. Open Food Facts) se devuelven sin cambios.
+     */
+    public String duplicateOrPassthrough(String publicPath) {
+        if (publicPath == null || publicPath.isBlank()) {
+            return null;
+        }
+        if (publicPath.startsWith("http") && parseSupabaseObjectName(publicPath).isEmpty()) {
+            return publicPath;
+        }
+        return copyIfStored(publicPath);
+    }
+
+    /**
+     * Duplica el fichero con un nuevo nombre y devuelve la nueva URL pública, o {@code null} si no hay origen.
      */
     public String copyIfStored(String publicPath) {
         if (publicPath == null || publicPath.isBlank()) {

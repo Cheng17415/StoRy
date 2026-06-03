@@ -12,10 +12,16 @@ import ExcelJS from 'exceljs';
 import { CategoriaDto, ProductoDto, formatProductoCategorias } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
+import { esStockBajo } from '../../core/utils/catalogo.util';
+import {
+  canEditFullProduct as checkCanEditFullProduct,
+  canEditProduct as checkCanEditProduct,
+} from '../../core/utils/company-role.util';
 import {
   GuardarArchivoOpciones,
   guardarArchivoConDialogo,
 } from '../../core/utils/save-file.util';
+import { closeDialogOnBackdropClick } from '../../core/utils/dialog.util';
 import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
 /** Valores separados por tabulador: Excel abre cada campo en su columna (A1, B1, C1…). */
@@ -233,16 +239,21 @@ function hexToRgb(hex: string): [number, number, number] {
       }
 
       @if (canRegistrarMovimiento()) {
-        <dialog #movDialog class="pd-mov-dialog">
+        <dialog #movDialog class="pd-mov-dialog" (click)="closeDialogOnBackdropClick($event, cerrarMovimiento.bind(this))">
           @if (movProducto(); as pr) {
             <div class="pd-mov-dialog-inner">
-              <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
-              <p class="pd-mov-dialog-sub">{{ pr.nombre }} - stock actual {{ pr.cantidad }}</p>
-              <app-registrar-movimiento
-                [producto]="pr"
-                (completado)="onMovimientoHecho()"
-                (cancelar)="cerrarMovimiento()"
-              />
+              <div class="modal-head-bar">
+                <div class="modal-head-bar__main">
+                  <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
+                  <p class="pd-mov-dialog-sub">{{ pr.nombre }} - stock actual {{ pr.cantidad }}</p>
+                </div>
+                <button type="button" class="modal-close" aria-label="Cerrar" (click)="cerrarMovimiento()">
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <app-registrar-movimiento [producto]="pr" (completado)="onMovimientoHecho()" />
             </div>
           }
         </dialog>
@@ -631,7 +642,9 @@ function hexToRgb(hex: string): [number, number, number] {
   `,
 })
 export class StockComponent implements OnInit {
+  protected readonly closeDialogOnBackdropClick = closeDialogOnBackdropClick;
   protected readonly formatProductoCategorias = formatProductoCategorias;
+  protected readonly esStockBajo = esStockBajo;
 
   private readonly api = inject(CatalogoApiService);
   private readonly auth = inject(AuthService);
@@ -676,19 +689,11 @@ export class StockComponent implements OnInit {
   }
 
   protected canRegistrarMovimiento(): boolean {
-    const r = this.auth.currentUser()?.companyRole;
-    return r === 'company_admin' || r === 'employee';
+    return checkCanEditProduct(this.auth.currentUser()?.companyRole);
   }
 
   protected canEditStockMinimo(): boolean {
-    return this.auth.currentUser()?.companyRole === 'company_admin';
-  }
-
-  protected esStockBajo(p: ProductoDto): boolean {
-    if (p.stockMinimo == null) {
-      return false;
-    }
-    return p.cantidad <= p.stockMinimo;
+    return checkCanEditFullProduct(this.auth.currentUser()?.companyRole);
   }
 
   protected deficit(p: ProductoDto): number {

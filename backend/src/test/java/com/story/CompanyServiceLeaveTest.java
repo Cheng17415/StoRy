@@ -9,9 +9,9 @@ import com.story.repository.CompanyInvitationRepository;
 import com.story.repository.CompanyMemberRepository;
 import com.story.repository.CompanyRepository;
 import com.story.repository.ProductoRepository;
+import com.story.service.CompanyMemberService;
 import com.story.service.CompanyService;
 import com.story.service.CurrentUserService;
-import com.story.service.ResendEmailService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,7 +38,7 @@ class CompanyServiceLeaveTest {
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
-    private ResendEmailService resendEmailService;
+    private CompanyMemberService companyMemberService;
 
     @InjectMocks
     private CompanyService companyService;

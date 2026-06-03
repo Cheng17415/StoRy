@@ -9,9 +9,9 @@ import com.story.model.company.CompanyMemberDto;
 import com.story.model.company.UpdateCompanyMemberRoleRequest;
 import com.story.repository.CompanyInvitationRepository;
 import com.story.repository.CompanyMemberRepository;
-import com.story.repository.CompanyRepository;
 import com.story.repository.ProductoRepository;
-import com.story.service.CompanyService;
+import com.story.security.CompanyAdminMessages;
+import com.story.service.CompanyMemberService;
 import com.story.service.CurrentUserService;
 import com.story.service.ResendEmailService;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -27,15 +26,15 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class CompanyServiceUpdateMemberRoleTest {
+class CompanyMemberServiceUpdateMemberRoleTest {
 
-    @Mock
-    private CompanyRepository companyRepository;
     @Mock
     private CompanyMemberRepository companyMemberRepository;
     @Mock
@@ -45,21 +44,19 @@ class CompanyServiceUpdateMemberRoleTest {
     @Mock
     private CurrentUserService currentUserService;
     @Mock
-    private PasswordEncoder passwordEncoder;
-    @Mock
     private ResendEmailService resendEmailService;
 
     @InjectMocks
-    private CompanyService companyService;
+    private CompanyMemberService companyMemberService;
 
     @Test
     void updateMemberRole_whenAdmin_updatesTargetMember() {
-        CompanyMember admin = buildMember(CompanyRole.company_admin, 44L, 8L);
         CompanyMember employee = buildMember(CompanyRole.employee, 44L, 12L);
-        when(currentUserService.requireCurrentCompanyMember()).thenReturn(admin);
+        doNothing().when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.CHANGE_MEMBER_ROLE);
+        when(currentUserService.requireCurrentCompanyId()).thenReturn(44L);
         when(companyMemberRepository.findById(new CompanyMemberId(44L, 12L))).thenReturn(Optional.of(employee));
 
-        CompanyMemberDto result = companyService.updateMemberRole(
+        CompanyMemberDto result = companyMemberService.updateMemberRole(
                 12L,
                 new UpdateCompanyMemberRoleRequest(CompanyRole.analytics_viewer)
         );
@@ -71,25 +68,30 @@ class CompanyServiceUpdateMemberRoleTest {
 
     @Test
     void updateMemberRole_whenNotAdmin_forbidden() {
-        CompanyMember employee = buildMember(CompanyRole.employee, 44L, 8L);
-        when(currentUserService.requireCurrentCompanyMember()).thenReturn(employee);
+        doThrow(new ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                CompanyAdminMessages.CHANGE_MEMBER_ROLE
+        )).when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.CHANGE_MEMBER_ROLE);
 
-        assertThatThrownBy(() -> companyService.updateMemberRole(
+        assertThatThrownBy(() -> companyMemberService.updateMemberRole(
                 12L,
                 new UpdateCompanyMemberRoleRequest(CompanyRole.employee)
         ))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Solo company_admin puede cambiar roles");
+                .hasMessageContaining("cambiar roles");
+
+        verify(companyMemberRepository, never()).save(any());
     }
 
     @Test
     void updateMemberRole_whenDemotingLastAdmin_conflict() {
         CompanyMember admin = buildMember(CompanyRole.company_admin, 44L, 8L);
-        when(currentUserService.requireCurrentCompanyMember()).thenReturn(admin);
+        doNothing().when(currentUserService).requireCompanyAdmin(CompanyAdminMessages.CHANGE_MEMBER_ROLE);
+        when(currentUserService.requireCurrentCompanyId()).thenReturn(44L);
         when(companyMemberRepository.findById(new CompanyMemberId(44L, 8L))).thenReturn(Optional.of(admin));
         when(companyMemberRepository.countByCompany_IdAndRole(44L, CompanyRole.company_admin)).thenReturn(1L);
 
-        assertThatThrownBy(() -> companyService.updateMemberRole(
+        assertThatThrownBy(() -> companyMemberService.updateMemberRole(
                 8L,
                 new UpdateCompanyMemberRoleRequest(CompanyRole.employee)
         ))

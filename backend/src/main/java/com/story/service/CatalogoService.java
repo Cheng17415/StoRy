@@ -1,9 +1,12 @@
 package com.story.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.story.model.Categoria;
 import com.story.model.CategoriaResponse;
 import com.story.model.Company;
 import com.story.model.CompanyRole;
+import com.story.model.OpenFoodFactsProductResponse;
 import com.story.model.Producto;
 import com.story.model.ProductoCarpeta;
 import com.story.model.ProductoResponse;
@@ -11,6 +14,8 @@ import com.story.model.Usuario;
 import com.story.repository.CategoriaRepository;
 import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
+import com.story.security.CompanyAdminMessages;
+import com.story.util.TextUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +38,8 @@ public class CatalogoService {
     private final FileStorageService fileStorageService;
     private final CurrentUserService currentUserService;
     private final InventarioService inventarioService;
+    private final OpenFoodFactsService openFoodFactsService;
+    private final ObjectMapper objectMapper;
 
     public CatalogoService(
             CategoriaRepository categoriaRepository,
@@ -40,7 +47,9 @@ public class CatalogoService {
             ProductoCarpetaRepository productoCarpetaRepository,
             FileStorageService fileStorageService,
             CurrentUserService currentUserService,
-            InventarioService inventarioService
+            InventarioService inventarioService,
+            OpenFoodFactsService openFoodFactsService,
+            ObjectMapper objectMapper
     ) {
         this.categoriaRepository = categoriaRepository;
         this.productoRepository = productoRepository;
@@ -48,6 +57,8 @@ public class CatalogoService {
         this.fileStorageService = fileStorageService;
         this.currentUserService = currentUserService;
         this.inventarioService = inventarioService;
+        this.openFoodFactsService = openFoodFactsService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -73,7 +84,7 @@ public class CatalogoService {
         Categoria c = new Categoria();
         c.setCompany(company);
         c.setNombre(trimmed);
-        c.setDescripcion(normalizeDescripcion(descripcion));
+        c.setDescripcion(TextUtils.normalizeOptionalText(descripcion));
         categoriaRepository.save(c);
         return new CategoriaResponse(c.getId(), c.getNombre(), c.getDescripcion());
     }
@@ -123,10 +134,7 @@ public class CatalogoService {
 
     @Transactional(readOnly = true)
     public ProductoResponse obtenerProducto(Long id) {
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
-        return toResponse(p);
+        return toResponse(requireProductoWithCategorias(id));
     }
 
     @Transactional
@@ -137,6 +145,10 @@ public class CatalogoService {
             String stockMinimoRaw,
             String descripcion,
             MultipartFile imagen,
+            String imagenUrl,
+            String codigoBarrasRaw,
+            String nutriScoreRaw,
+            String alergenosJson,
             Long carpetaId
     ) {
         if (nombre == null || nombre.isBlank()) {
@@ -151,12 +163,19 @@ public class CatalogoService {
         p.setUsuario(owner);
         p.setCompany(company);
         p.setNombre(nombre.trim());
-        p.setDescripcion(normalizeDescripcion(descripcion));
+        p.setDescripcion(TextUtils.normalizeOptionalText(descripcion));
         p.setCantidad(cantidad);
         p.setPrecio(precio);
         p.setStockMinimo(stockMinimo);
         p.setCodigo(generateUniqueCodigo(companyId));
-        p.setImagen(fileStorageService.store(imagen));
+        String codigoBarras = normalizeCodigoBarras(codigoBarrasRaw);
+        if (codigoBarrasRaw != null && !codigoBarrasRaw.isBlank() && codigoBarras == null) {
+            throw new IllegalArgumentException("El código de barras debe contener entre 8 y 14 dígitos");
+        }
+        p.setCodigoBarras(codigoBarras);
+        p.setNutriScore(OpenFoodFactsService.normalizeNutriScore(nutriScoreRaw));
+        p.setAlergenos(parseAlergenosJson(alergenosJson));
+        p.setImagen(resolveImagen(imagen, imagenUrl));
         p.setActivo(true);
         Instant now = Instant.now();
         p.setFechaCreacion(now);
@@ -168,6 +187,28 @@ public class CatalogoService {
         }
         productoRepository.save(p);
         inventarioService.registrarStockInicial(p, cantidad);
+        return toResponse(p);
+    }
+
+    @Transactional
+    public ProductoResponse registrarCodigoBarras(Long productoId, String codigoBarrasRaw) {
+        currentUserService.requireRoleAtLeastEmployee();
+        Producto p = requireProductoWithCategorias(productoId);
+        if (p.getCodigoBarras() != null && !p.getCodigoBarras().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El producto ya tiene código de barras");
+        }
+        String codigoBarras = normalizeCodigoBarras(codigoBarrasRaw);
+        if (codigoBarras == null) {
+            throw new IllegalArgumentException("El código de barras debe contener entre 8 y 14 dígitos");
+        }
+        OpenFoodFactsProductResponse off = openFoodFactsService.fetchProduct(codigoBarras)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Producto no encontrado en Open Food Facts"
+                ));
+        applyOpenFoodFactsData(p, off);
+        p.setFechaActualizacion(Instant.now());
+        productoRepository.save(p);
         return toResponse(p);
     }
 
@@ -185,8 +226,7 @@ public class CatalogoService {
         currentUserService.requireRoleAtLeastEmployee();
         CompanyRole role = currentUserService.requireCurrentCompanyRole();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto p = requireProducto(id);
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre es obligatorio");
         }
@@ -196,7 +236,7 @@ public class CatalogoService {
             p.setCantidad(cantidad);
         } else {
             p.setNombre(nombre.trim());
-            p.setDescripcion(normalizeDescripcion(descripcion));
+            p.setDescripcion(TextUtils.normalizeOptionalText(descripcion));
             p.setCantidad(cantidad);
             p.setPrecio(precio);
             p.setStockMinimo(stockMinimo);
@@ -218,8 +258,7 @@ public class CatalogoService {
     public ProductoResponse moverProductoCarpeta(Long productoId, Long carpetaId) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_Id(productoId, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto p = requireProducto(productoId);
         if (carpetaId == null) {
             p.setCarpeta(null);
         } else {
@@ -234,13 +273,11 @@ public class CatalogoService {
 
     @Transactional
     public ProductoResponse actualizarStockMinimo(Long productoId, Integer stockMinimo) {
-        currentUserService.requireCompanyAdmin();
+        currentUserService.requireCompanyAdmin(CompanyAdminMessages.UPDATE_STOCK_MINIMO);
         if (stockMinimo != null && stockMinimo < 0) {
             throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
         }
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_Id(productoId, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto p = requireProducto(productoId);
         p.setStockMinimo(stockMinimo);
         p.setFechaActualizacion(Instant.now());
         productoRepository.save(p);
@@ -251,8 +288,7 @@ public class CatalogoService {
     public ProductoResponse agregarProductoCategoria(Long productoId, Long categoriaId, String nombre) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(productoId, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto p = requireProductoWithCategorias(productoId);
 
         Categoria categoria = resolveCategoriaParaAgregar(companyId, categoriaId, nombre);
         boolean yaAsignada = p.getCategorias().stream().anyMatch(c -> c.getId().equals(categoria.getId()));
@@ -268,8 +304,7 @@ public class CatalogoService {
     public ProductoResponse quitarProductoCategoria(Long productoId, Long categoriaId) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_IdWithCategorias(productoId, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto p = requireProductoWithCategorias(productoId);
         categoriaRepository.findByIdAndCompany_Id(categoriaId, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no encontrada"));
         if (p.getCategorias().removeIf(c -> c.getId().equals(categoriaId))) {
@@ -299,9 +334,7 @@ public class CatalogoService {
 
     @Transactional
     public ProductoResponse clonarProducto(Long productoId) {
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto origen = productoRepository.findByIdAndCompany_Id(productoId, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        Producto origen = requireProducto(productoId);
         return clonarProductoEn(origen, origen.getCarpeta());
     }
 
@@ -336,7 +369,10 @@ public class CatalogoService {
         p.setPrecio(origen.getPrecio());
         p.setStockMinimo(origen.getStockMinimo());
         p.setCodigo(generateUniqueCodigo(companyId));
-        p.setImagen(fileStorageService.copyIfStored(origen.getImagen()));
+        p.setCodigoBarras(origen.getCodigoBarras());
+        p.setNutriScore(origen.getNutriScore());
+        p.setAlergenos(copyAlergenos(origen.getAlergenos()));
+        p.setImagen(fileStorageService.duplicateOrPassthrough(origen.getImagen()));
         p.setCategorias(new HashSet<>(origen.getCategorias()));
         p.setCarpeta(carpetaDestino);
         p.setActivo(true);
@@ -350,12 +386,8 @@ public class CatalogoService {
 
     @Transactional
     public void eliminarProducto(Long id) {
-        if (currentUserService.requireCurrentCompanyRole() != CompanyRole.company_admin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo company_admin puede eliminar productos");
-        }
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        Producto p = productoRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        currentUserService.requireCompanyAdmin(CompanyAdminMessages.DELETE_PRODUCT);
+        Producto p = requireProducto(id);
         fileStorageService.deleteIfStored(p.getImagen());
         productoRepository.delete(p);
     }
@@ -373,13 +405,14 @@ public class CatalogoService {
         productoRepository.delete(p);
     }
 
-    /** Texto libre (notas); vacío o solo espacios se guarda como null. */
-    private String normalizeDescripcion(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String t = raw.trim();
-        return t.isEmpty() ? null : t;
+    private Producto requireProducto(Long id) {
+        return productoRepository.findByIdAndCompany_Id(id, currentUserService.requireCurrentCompanyId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+    }
+
+    private Producto requireProductoWithCategorias(Long id) {
+        return productoRepository.findByIdAndCompany_IdWithCategorias(id, currentUserService.requireCurrentCompanyId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
     }
 
     private ProductoCarpeta resolveCarpetaFromParam(Long companyId, String raw) {
@@ -430,6 +463,9 @@ public class CatalogoService {
                 p.getNombre(),
                 p.getDescripcion(),
                 p.getCodigo(),
+                p.getCodigoBarras(),
+                p.getNutriScore(),
+                copyAlergenos(p.getAlergenos()),
                 p.getPrecio(),
                 p.getCantidad(),
                 p.getStockMinimo(),
@@ -441,5 +477,56 @@ public class CatalogoService {
                 p.getCarpeta() != null ? p.getCarpeta().getId() : null,
                 p.getCarpeta() != null ? p.getCarpeta().getNombre() : null
         );
+    }
+
+    private void applyOpenFoodFactsData(Producto p, OpenFoodFactsProductResponse off) {
+        p.setCodigoBarras(off.codigoBarras());
+        p.setNutriScore(off.nutriScore());
+        p.setAlergenos(copyAlergenos(off.alergenos()));
+        if (p.getImagen() == null || p.getImagen().isBlank()) {
+            p.setImagen(off.imagenUrl());
+        }
+    }
+
+    private String resolveImagen(MultipartFile imagen, String imagenUrl) {
+        if (imagen != null && !imagen.isEmpty()) {
+            return fileStorageService.store(imagen);
+        }
+        if (imagenUrl != null && !imagenUrl.isBlank()) {
+            return imagenUrl.trim();
+        }
+        return null;
+    }
+
+    private String normalizeCodigoBarras(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return OpenFoodFactsService.normalizeBarcode(raw);
+    }
+
+    private List<String> parseAlergenosJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            List<String> tags = objectMapper.readValue(raw, new TypeReference<>() {});
+            if (tags == null || tags.isEmpty()) {
+                return null;
+            }
+            return List.copyOf(tags.stream()
+                    .filter(tag -> tag != null && !tag.isBlank())
+                    .map(String::trim)
+                    .toList());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Formato de alérgenos inválido");
+        }
+    }
+
+    private static List<String> copyAlergenos(List<String> source) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+        return List.copyOf(source);
     }
 }

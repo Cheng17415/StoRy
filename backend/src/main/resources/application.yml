@@ -15,6 +15,11 @@ app:
     api-key: ${RESEND_API_KEY:}
     from: ${RESEND_FROM:}
     invite-base-url: ${APP_COMPANY_INVITE_URL_BASE:http://localhost:4200/empresa?inviteToken=}
+  open-food-facts:
+    base-url: ${OFF_BASE_URL:https://world.openfoodfacts.net}
+    user-agent: StoRy/1.0 (chengzhe17415@gmail.com)
+    basic-auth-username: off
+    basic-auth-password: off
 
 spring:
   application:

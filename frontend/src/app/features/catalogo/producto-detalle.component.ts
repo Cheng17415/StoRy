@@ -1,16 +1,31 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, UpperCasePipe } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { MovimientoStockDto, ProductoDto, CategoriaDto } from '../../core/models/catalogo.models';
+import { MovimientoStockDto, ProductoDto, CategoriaDto, formatAlergenoTag } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
 import { CatalogoApiService } from '../../core/services/catalogo-api.service';
+import { RegistrarCodigoBarrasComponent } from './registrar-codigo-barras.component';
+import { extractApiError } from '../../core/utils/api-error.util';
+import {
+  canDeleteProduct as checkCanDeleteProduct,
+  canEditFullProduct as checkCanEditFullProduct,
+  canEditProduct as checkCanEditProduct,
+} from '../../core/utils/company-role.util';
+import {
+  esStockBajo,
+  movCantidadDisplay,
+  normalizeStockMinimo,
+  nutriScoreClass,
+  tipoMovimientoLabel,
+} from '../../core/utils/catalogo.util';
+import { closeDialogOnBackdropClick } from '../../core/utils/dialog.util';
 import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
 
 @Component({
   selector: 'app-producto-detalle',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, CurrencyPipe, RegistrarMovimientoComponent],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, CurrencyPipe, UpperCasePipe, RegistrarMovimientoComponent, RegistrarCodigoBarrasComponent],
   template: `
     <div class="pd-page">
       <nav class="pd-breadcrumb" aria-label="Migas de pan">
@@ -48,6 +63,9 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
               </label>
               <div class="pd-hero-meta">
                 <span class="pd-meta-code" title="Código interno">{{ p.codigo }}</span>
+                @if (p.codigoBarras) {
+                  <span class="pd-meta-code" title="Código de barras">{{ p.codigoBarras }}</span>
+                }
                 @for (c of p.categorias; track c.id) {
                   <span class="pd-meta-pill">{{ c.nombre }}</span>
                 }
@@ -82,6 +100,11 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
                     @if (canEditStock()) {
                       <button type="button" role="menuitem" class="pd-more-item" (click)="openMovimientoModal()">
                         Registrar movimiento
+                      </button>
+                    }
+                    @if (canEditStock() && !p.codigoBarras) {
+                      <button type="button" role="menuitem" class="pd-more-item" (click)="openBarcodeModal()">
+                        Registrar código de barras
                       </button>
                     }
                     @if (canEditStock() && canDeleteProduct()) {
@@ -183,7 +206,7 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
             <div class="pd-metric-top">
               <span class="pd-metric-label">Valor total</span>
             </div>
-            <p class="pd-metric-value">{{ totalDisplay() | currency: companyCurrency() }}</p>
+            <p class="pd-metric-value">{{ totalDisplay() | currency: auth.companyCurrency() }}</p>
           </div>
         </section>
 
@@ -317,6 +340,35 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
                   ></textarea>
                 </label>
               </div>
+              @if (p.codigoBarras || p.nutriScore || p.alergenos.length) {
+                <div class="pd-block">
+                  <h3 class="pd-block-title">Datos alimentarios</h3>
+                  @if (p.codigoBarras) {
+                    <p class="pd-off-row">
+                      <span class="pd-off-label">Código de barras</span>
+                      <span class="pd-off-value">{{ p.codigoBarras }}</span>
+                    </p>
+                  }
+                  @if (p.nutriScore) {
+                    <p class="pd-off-row">
+                      <span class="pd-off-label">Nutri-Score</span>
+                      <span class="story-nutri" [class]="nutriScoreClass(p.nutriScore)">
+                        {{ p.nutriScore | uppercase }}
+                      </span>
+                    </p>
+                  }
+                  @if (p.alergenos.length) {
+                    <div class="pd-off-row pd-off-row--tags">
+                      <span class="pd-off-label">Alérgenos</span>
+                      <div class="story-allergen-tags">
+                        @for (tag of p.alergenos; track tag) {
+                          <span class="story-allergen-tag">{{ formatAlergenoTag(tag) }}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
             </section>
           </div>
 
@@ -376,17 +428,40 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
         </form>
 
         @if (canEditStock()) {
-          <dialog #movDialog class="pd-mov-dialog">
+          <dialog #movDialog class="pd-mov-dialog" (click)="closeDialogOnBackdropClick($event, closeMovimientoModal.bind(this))">
             <div class="pd-mov-dialog-inner">
-              <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
-              <p class="pd-mov-dialog-sub">{{ p.nombre }} - stock actual {{ p.cantidad }}</p>
-              <app-registrar-movimiento
-                [producto]="p"
-                (completado)="onMovimientoModalOk()"
-                (cancelar)="closeMovimientoModal()"
-              />
+              <div class="modal-head-bar">
+                <div class="modal-head-bar__main">
+                  <h2 id="pd-mov-dialog-title" class="pd-mov-dialog-title">Registrar movimiento</h2>
+                  <p class="pd-mov-dialog-sub">{{ p.nombre }} - stock actual {{ p.cantidad }}</p>
+                </div>
+                <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeMovimientoModal()">
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <app-registrar-movimiento [producto]="p" (completado)="onMovimientoModalOk()" />
             </div>
           </dialog>
+          @if (!p.codigoBarras) {
+            <dialog #barcodeDialog class="pd-mov-dialog" (click)="closeDialogOnBackdropClick($event, closeBarcodeModal.bind(this))">
+              <div class="pd-mov-dialog-inner">
+                <div class="modal-head-bar">
+                  <div class="modal-head-bar__main">
+                    <h2 class="pd-mov-dialog-title">Registrar código de barras</h2>
+                    <p class="pd-mov-dialog-sub">{{ p.nombre }}</p>
+                  </div>
+                  <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeBarcodeModal()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <app-registrar-codigo-barras [productoId]="p.id" (completado)="onBarcodeModalOk()" />
+              </div>
+            </dialog>
+          }
         }
       }
     </div>
@@ -785,10 +860,14 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
     }
 
     .pd-mov-dialog-sub {
-      margin: 0 0 0.4rem;
+      margin: 0.25rem 0 0;
       font-size: 0.88rem;
       font-weight: 600;
       color: var(--pd-primary);
+    }
+
+    .pd-mov-dialog-inner .modal-head-bar {
+      margin-bottom: 0.85rem;
     }
 
     .pd-mov-dialog-hint {
@@ -1165,6 +1244,30 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
       letter-spacing: 0.03em;
     }
 
+    .pd-off-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0 0 0.55rem;
+      font-size: 0.9rem;
+    }
+
+    .pd-off-row--tags {
+      align-items: flex-start;
+    }
+
+    .pd-off-label {
+      min-width: 7rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--pd-muted);
+    }
+
+    .pd-off-value {
+      font-variant-numeric: tabular-nums;
+      color: var(--pd-text);
+    }
+
     .pd-tag {
       display: inline-block;
       padding: 0.3rem 0.65rem;
@@ -1474,10 +1577,17 @@ import { RegistrarMovimientoComponent } from './registrar-movimiento.component';
   `,
 })
 export class ProductoDetalleComponent implements OnInit {
+  protected readonly closeDialogOnBackdropClick = closeDialogOnBackdropClick;
+  protected readonly formatAlergenoTag = formatAlergenoTag;
+  protected readonly esStockBajo = esStockBajo;
+  protected readonly tipoMovimientoLabel = tipoMovimientoLabel;
+  protected readonly movCantidadDisplay = movCantidadDisplay;
+  protected readonly nutriScoreClass = nutriScoreClass;
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(CatalogoApiService);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly loading = signal(true);
@@ -1486,10 +1596,6 @@ export class ProductoDetalleComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly formError = signal('');
   protected readonly movLoading = signal(false);
-
-  protected companyCurrency(): string {
-    return this.auth.currentUser()?.companyCurrency ?? 'EUR';
-  }
   protected readonly movimientos = signal<MovimientoStockDto[]>([]);
   protected readonly editMode = signal(false);
   protected readonly moreMenuOpen = signal(false);
@@ -1504,6 +1610,7 @@ export class ProductoDetalleComponent implements OnInit {
   private productId: number | null = null;
   private readonly moreRootRef = viewChild<ElementRef<HTMLElement>>('moreRoot');
   private readonly movDialogRef = viewChild<ElementRef<HTMLDialogElement>>('movDialog');
+  private readonly barcodeDialogRef = viewChild<ElementRef<HTMLDialogElement>>('barcodeDialog');
   private readonly catInputRef = viewChild<ElementRef<HTMLInputElement>>('catInputRef');
   private readonly catComboboxRef = viewChild<ElementRef<HTMLElement>>('catCombobox');
 
@@ -1619,11 +1726,10 @@ export class ProductoDetalleComponent implements OnInit {
           this.loadCategorias();
         }
       },
-      error: (err: { error?: { message?: string }; message?: string }) => {
-        this.categoriaSaving.set(false);
-        const msg = err?.error?.message ?? err?.message ?? 'No se pudo añadir la categoría';
-        this.categoriaError.set(typeof msg === 'string' ? msg : 'No se pudo añadir la categoría');
-      },
+        error: (err: unknown) => {
+          this.categoriaSaving.set(false);
+          this.categoriaError.set(extractApiError(err, 'No se pudo añadir la categoría'));
+        },
     });
   }
 
@@ -1636,10 +1742,9 @@ export class ProductoDetalleComponent implements OnInit {
         this.producto.set(p);
         this.categoriaSaving.set(false);
       },
-      error: (err: { error?: { message?: string }; message?: string }) => {
+      error: (err: unknown) => {
         this.categoriaSaving.set(false);
-        const msg = err?.error?.message ?? err?.message ?? 'No se pudo quitar la categoría';
-        this.categoriaError.set(typeof msg === 'string' ? msg : 'No se pudo quitar la categoría');
+        this.categoriaError.set(extractApiError(err, 'No se pudo quitar la categoría'));
       },
     });
   }
@@ -1692,11 +1797,6 @@ export class ProductoDetalleComponent implements OnInit {
     return t ? '' : 'Sin notas. Pulsa Editar para añadirlas.';
   }
 
-  protected esStockBajo(p: ProductoDto): boolean {
-    if (p.stockMinimo == null) return false;
-    return p.cantidad <= p.stockMinimo;
-  }
-
   protected totalDisplay(): number {
     if (this.editMode()) {
       const v = this.form.getRawValue();
@@ -1707,32 +1807,6 @@ export class ProductoDetalleComponent implements OnInit {
     const p = this.producto();
     if (!p) return 0;
     return (Number(p.precio) || 0) * p.cantidad;
-  }
-
-  protected tipoMovimientoLabel(tipo: string): string {
-    switch (tipo) {
-      case 'ENTRADA':
-        return 'Entrada';
-      case 'SALIDA':
-        return 'Salida';
-      case 'AJUSTE':
-        return 'Ajuste';
-      default:
-        return tipo;
-    }
-  }
-
-  protected movCantidadDisplay(m: MovimientoStockDto): string {
-    switch (m.tipo) {
-      case 'ENTRADA':
-        return `+${m.cantidad}`;
-      case 'SALIDA':
-        return `−${m.cantidad}`;
-      case 'AJUSTE':
-        return `→ ${m.cantidad}`;
-      default:
-        return String(m.cantidad);
-    }
   }
 
   protected onMovimientoManualOk(): void {
@@ -1756,8 +1830,26 @@ export class ProductoDetalleComponent implements OnInit {
     queueMicrotask(() => this.movDialogRef()?.nativeElement.showModal());
   }
 
+  protected openBarcodeModal(): void {
+    this.moreMenuOpen.set(false);
+    queueMicrotask(() => this.barcodeDialogRef()?.nativeElement.showModal());
+  }
+
   protected closeMovimientoModal(): void {
     this.movDialogRef()?.nativeElement.close();
+  }
+
+  protected closeBarcodeModal(): void {
+    this.barcodeDialogRef()?.nativeElement.close();
+  }
+
+  protected onBarcodeModalOk(): void {
+    this.closeBarcodeModal();
+    const id = this.productId;
+    if (id == null) return;
+    this.api.getProducto(id).subscribe({
+      next: (p) => this.producto.set(p),
+    });
   }
 
   protected onMovimientoModalOk(): void {
@@ -1833,7 +1925,7 @@ export class ProductoDetalleComponent implements OnInit {
         nombre: v.nombre.trim(),
         cantidad: v.cantidad,
         precio: v.precio,
-        stockMinimo: this.normalizeStockMinimo(v.stockMinimo),
+        stockMinimo: normalizeStockMinimo(v.stockMinimo),
         descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
         imagen: this.file,
       })
@@ -1856,19 +1948,11 @@ export class ProductoDetalleComponent implements OnInit {
           this.loadMovimientos(this.productId!);
           this.editMode.set(false);
         },
-        error: (err: { error?: { message?: string }; message?: string }) => {
+        error: (err: unknown) => {
           this.saving.set(false);
-          const msg = err?.error?.message ?? err?.message ?? 'Error al guardar';
-          this.formError.set(typeof msg === 'string' ? msg : 'Error al guardar');
+          this.formError.set(extractApiError(err, 'Error al guardar'));
         },
       });
-  }
-
-  private normalizeStockMinimo(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
-    const n = typeof value === 'number' ? value : Number(value);
-    if (Number.isNaN(n)) return null;
-    return n < 0 ? null : Math.floor(n);
   }
 
   protected confirmDelete(): void {
@@ -1886,20 +1970,18 @@ export class ProductoDetalleComponent implements OnInit {
   }
 
   protected canDeleteProduct(): boolean {
-    return this.auth.currentUser()?.companyRole === 'company_admin';
+    return checkCanDeleteProduct(this.auth.currentUser()?.companyRole);
   }
 
   protected canEditProduct(): boolean {
-    const role = this.auth.currentUser()?.companyRole;
-    return role === 'company_admin' || role === 'employee';
+    return checkCanEditProduct(this.auth.currentUser()?.companyRole);
   }
 
   protected canEditFullProduct(): boolean {
-    return this.auth.currentUser()?.companyRole === 'company_admin';
+    return checkCanEditFullProduct(this.auth.currentUser()?.companyRole);
   }
 
   protected canEditStock(): boolean {
-    const role = this.auth.currentUser()?.companyRole;
-    return role === 'company_admin' || role === 'employee';
+    return checkCanEditProduct(this.auth.currentUser()?.companyRole);
   }
 }

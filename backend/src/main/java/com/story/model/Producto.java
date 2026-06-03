@@ -11,10 +11,13 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -54,6 +57,16 @@ public class Producto {
 
     @Column(length = 1024)
     private String imagen;
+
+    @Column(name = "codigo_barras", length = 32)
+    private String codigoBarras;
+
+    @Column(name = "nutri_score", length = 1)
+    private String nutriScore;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "alergenos")
+    private List<String> alergenos;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -161,6 +174,30 @@ public class Producto {
 
     public void setImagen(String imagen) {
         this.imagen = imagen;
+    }
+
+    public String getCodigoBarras() {
+        return codigoBarras;
+    }
+
+    public void setCodigoBarras(String codigoBarras) {
+        this.codigoBarras = codigoBarras;
+    }
+
+    public String getNutriScore() {
+        return nutriScore;
+    }
+
+    public void setNutriScore(String nutriScore) {
+        this.nutriScore = nutriScore;
+    }
+
+    public List<String> getAlergenos() {
+        return alergenos;
+    }
+
+    public void setAlergenos(List<String> alergenos) {
+        this.alergenos = alergenos;
     }
 
     public Set<Categoria> getCategorias() {

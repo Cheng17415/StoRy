@@ -7,6 +7,7 @@ import { take } from 'rxjs/operators';
 import { AccountApiService } from '../../core/services/account-api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { GoogleAuthConfigService } from '../../core/services/google-auth-config.service';
+import { extractApiError } from '../../core/utils/api-error.util';
 import { GoogleSignInButtonComponent } from '../auth/google-sign-in-button.component';
 
 @Component({
@@ -516,7 +517,7 @@ export class PerfilComponent implements OnInit {
           this.loading.set(false);
           return;
         }
-        this.loadError.set(this.extractError(err));
+        this.loadError.set(extractApiError(err));
         this.loading.set(false);
       },
     });
@@ -536,7 +537,7 @@ export class PerfilComponent implements OnInit {
         this.savingProfile.set(false);
       },
       error: (err: unknown) => {
-        this.profileFeedback.set({ kind: 'error', text: this.extractError(err) });
+        this.profileFeedback.set({ kind: 'error', text: extractApiError(err) });
         this.savingProfile.set(false);
       },
     });
@@ -554,7 +555,7 @@ export class PerfilComponent implements OnInit {
         this.savingPassword.set(false);
       },
       error: (err: unknown) => {
-        this.passwordFeedback.set({ kind: 'error', text: this.extractError(err) });
+        this.passwordFeedback.set({ kind: 'error', text: extractApiError(err) });
         this.savingPassword.set(false);
       },
     });
@@ -573,7 +574,7 @@ export class PerfilComponent implements OnInit {
         this.linkBusy.set(false);
       },
       error: (err: unknown) => {
-        this.linkFeedback.set({ kind: 'error', text: this.extractError(err) });
+        this.linkFeedback.set({ kind: 'error', text: extractApiError(err) });
         this.linkBusy.set(false);
       },
     });
@@ -593,19 +594,9 @@ export class PerfilComponent implements OnInit {
         this.linkBusy.set(false);
       },
       error: (err: unknown) => {
-        this.linkFeedback.set({ kind: 'error', text: this.extractError(err) });
+        this.linkFeedback.set({ kind: 'error', text: extractApiError(err) });
         this.linkBusy.set(false);
       },
     });
-  }
-
-  private extractError(err: unknown): string {
-    if (err instanceof HttpErrorResponse && err.error && typeof err.error === 'object') {
-      const body = err.error as { message?: string };
-      if (body.message && typeof body.message === 'string') {
-        return body.message;
-      }
-    }
-    return 'No se pudo completar la operación.';
   }
 }

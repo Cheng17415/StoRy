@@ -82,7 +82,7 @@ class CatalogoServiceClonarProductoTest {
         doNothing().when(currentUserService).requireRoleAtLeastEmployee();
         when(currentUserService.requireCurrentUsuario()).thenReturn(u);
         when(currentUserService.requireCurrentCompanyMember()).thenReturn(memberWithCompany(company));
-        when(fileStorageService.copyIfStored("https://example.supabase.co/storage/v1/object/public/imagenes/old.png"))
+        when(fileStorageService.duplicateOrPassthrough("https://example.supabase.co/storage/v1/object/public/imagenes/old.png"))
                 .thenReturn("https://example.supabase.co/storage/v1/object/public/imagenes/new.png");
         when(productoRepository.existsByCompany_IdAndCodigo(eq(3L), any())).thenReturn(false);
 

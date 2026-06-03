@@ -4,11 +4,12 @@ import com.story.model.CarpetaArbolResponse;
 import com.story.model.CarpetaResponse;
 import com.story.model.ClonarCarpetaResponse;
 import com.story.model.Company;
-import com.story.model.CompanyRole;
 import com.story.model.Producto;
 import com.story.model.ProductoCarpeta;
 import com.story.repository.ProductoCarpetaRepository;
 import com.story.repository.ProductoRepository;
+import com.story.security.CompanyAdminMessages;
+import com.story.util.TextUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,20 +83,12 @@ public class CarpetaService {
             c.setParent(parent);
         }
         c.setNombre(nombre.trim());
-        c.setDescripcion(normalizeDescripcion(descripcionRaw));
+        c.setDescripcion(TextUtils.normalizeOptionalText(descripcionRaw));
         Instant now = Instant.now();
         c.setFechaCreacion(now);
         c.setFechaActualizacion(now);
         productoCarpetaRepository.save(c);
         return toResponse(c);
-    }
-
-    private static String normalizeDescripcion(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String t = raw.trim();
-        return t.isEmpty() ? null : t;
     }
 
     @Transactional
@@ -104,9 +97,7 @@ public class CarpetaService {
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre es obligatorio");
         }
-        Long companyId = currentUserService.requireCurrentCompanyId();
-        ProductoCarpeta c = productoCarpetaRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        ProductoCarpeta c = requireCarpeta(id);
         c.setNombre(nombre.trim());
         c.setFechaActualizacion(Instant.now());
         productoCarpetaRepository.save(c);
@@ -117,8 +108,7 @@ public class CarpetaService {
     public CarpetaResponse mover(Long id, Long newParentId) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        ProductoCarpeta c = productoCarpetaRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        ProductoCarpeta c = requireCarpeta(id);
         Set<Long> subtree = collectSubtreeIds(companyId, id);
         if (newParentId != null) {
             if (subtree.contains(newParentId)) {
@@ -137,12 +127,9 @@ public class CarpetaService {
 
     @Transactional
     public void eliminar(Long id) {
-        if (currentUserService.requireCurrentCompanyRole() != CompanyRole.company_admin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo company_admin puede eliminar carpetas");
-        }
+        currentUserService.requireCompanyAdmin(CompanyAdminMessages.DELETE_FOLDER);
         Long companyId = currentUserService.requireCurrentCompanyId();
-        ProductoCarpeta carpeta = productoCarpetaRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        ProductoCarpeta carpeta = requireCarpeta(id);
         Set<Long> subtree = collectSubtreeIds(companyId, id);
         List<Producto> productos = productoRepository.findAllByCompany_IdAndCarpeta_IdIn(companyId, subtree);
         for (Producto p : productos) {
@@ -155,8 +142,7 @@ public class CarpetaService {
     public ClonarCarpetaResponse clonar(Long id, Long parentIdDestinoExplicito) {
         currentUserService.requireRoleAtLeastEmployee();
         Long companyId = currentUserService.requireCurrentCompanyId();
-        ProductoCarpeta origen = productoCarpetaRepository.findByIdAndCompany_Id(id, companyId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
+        ProductoCarpeta origen = requireCarpeta(id);
         ProductoCarpeta parentDest;
         if (parentIdDestinoExplicito != null) {
             parentDest = productoCarpetaRepository.findByIdAndCompany_Id(parentIdDestinoExplicito, companyId)
@@ -197,6 +183,11 @@ public class CarpetaService {
             cloneRecursive(hijo, nueva, folders, products);
         }
         return nueva;
+    }
+
+    private ProductoCarpeta requireCarpeta(Long id) {
+        return productoCarpetaRepository.findByIdAndCompany_Id(id, currentUserService.requireCurrentCompanyId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Carpeta no encontrada"));
     }
 
     private Set<Long> collectSubtreeIds(Long companyId, Long rootId) {

@@ -1,4 +1,4 @@
-import { AsyncPipe, CurrencyPipe, DatePipe } from '@angular/common';
+import { AsyncPipe, CurrencyPipe, DatePipe, UpperCasePipe } from '@angular/common';
 import {
   Component,
   computed,
@@ -22,9 +22,23 @@ import {
   switchMap,
   tap,
 } from 'rxjs';
-import { CarpetaArbolDto, CategoriaDto, MovimientoStockDto, ProductoDto, formatProductoCategorias, productoCoincideCategoria } from '../../core/models/catalogo.models';
+import { CarpetaArbolDto, CategoriaDto, MovimientoStockDto, OpenFoodFactsProductDto, ProductoDto, formatAlergenoTag, formatProductoCategorias, productoCoincideCategoria } from '../../core/models/catalogo.models';
 import { AuthService } from '../../core/services/auth.service';
+import {
+  canDeleteProduct as checkCanDeleteProduct,
+  canEmployeeCatalog as hasEmployeeCatalogRole,
+} from '../../core/utils/company-role.util';
 import { CatalogoApiService, ProductoFormPayload } from '../../core/services/catalogo-api.service';
+import { OpenFoodFactsApiService } from '../../core/services/open-food-facts-api.service';
+import { extractApiError } from '../../core/utils/api-error.util';
+import {
+  esStockBajo,
+  movCantidadDisplay,
+  normalizeStockMinimo,
+  nutriScoreClass,
+  tipoMovimientoLabel,
+} from '../../core/utils/catalogo.util';
+import { closeDialogOnBackdropClick } from '../../core/utils/dialog.util';
 
 interface ProductosPageData {
   items: ProductoDto[];
@@ -143,7 +157,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
 @Component({
   selector: 'app-productos',
   standalone: true,
-  imports: [AsyncPipe, DatePipe, CurrencyPipe, ReactiveFormsModule],
+  imports: [AsyncPipe, DatePipe, CurrencyPipe, UpperCasePipe, ReactiveFormsModule],
   template: `
     <div class="productos-page">
       <div class="productos-layout">
@@ -205,7 +219,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
               Nueva carpeta
             </button>
           }
-          @if (canCreateProduct()) {
+          @if (canEmployeeCatalog()) {
             <button type="button" class="btn-cta" (click)="openCreate()">
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
@@ -382,7 +396,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                 </span>
                 <div class="stat-body">
                   <span class="stat-label">Valor total</span>
-                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: auth.companyCurrency() }}</span>
                 </div>
               </div>
             </section>
@@ -447,7 +461,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                       <div class="card-footer">
                         <span class="card-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
                         <span class="card-sep">|</span>
-                        <span class="card-price">{{ d.totalValue | currency: companyCurrency() }}</span>
+                        <span class="card-price">{{ d.totalValue | currency: auth.companyCurrency() }}</span>
                       </div>
                     </div>
                   </article>
@@ -517,7 +531,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                         <span class="card-sep">|</span>
                         <span class="card-price">
                           @if (p.precio != null) {
-                            {{ p.precio | currency: companyCurrency() }}
+                            {{ p.precio | currency: auth.companyCurrency() }}
                           } @else {
                             —
                           }
@@ -561,7 +575,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                 </span>
                 <div class="stat-body">
                   <span class="stat-label">Valor total</span>
-                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: auth.companyCurrency() }}</span>
                 </div>
               </div>
             </section>
@@ -587,7 +601,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     </div>
                     <div class="list-stats">
                       <span class="list-qty">{{ d.totalQty }} {{ d.totalQty === 1 ? 'ud.' : 'uds.' }}</span>
-                      <span class="list-price">{{ d.totalValue | currency: companyCurrency() }}</span>
+                      <span class="list-price">{{ d.totalValue | currency: auth.companyCurrency() }}</span>
                     </div>
                     @if (canManageFolders()) {
                       <div class="folder-item-menu-root list-kebab" data-stop-nav>
@@ -650,7 +664,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                       <span class="list-qty">{{ p.cantidad }} {{ p.cantidad === 1 ? 'ud.' : 'uds.' }}</span>
                       <span class="list-price">
                         @if (p.precio != null) {
-                          {{ p.precio | currency: companyCurrency() }}
+                          {{ p.precio | currency: auth.companyCurrency() }}
                         } @else {
                           —
                         }
@@ -735,7 +749,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                 </span>
                 <div class="stat-body">
                   <span class="stat-label">Valor total</span>
-                  <span class="stat-value">{{ vm.pageData.totalValue | currency: companyCurrency() }}</span>
+                  <span class="stat-value">{{ vm.pageData.totalValue | currency: auth.companyCurrency() }}</span>
                 </div>
               </div>
             </section>
@@ -770,7 +784,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                         <td class="td-code">—</td>
                         <td><span class="folder-meta-label">Carpeta</span></td>
                         <td class="col-num">{{ d.totalQty }}</td>
-                        <td class="col-num td-price">{{ d.totalValue | currency: companyCurrency() }}</td>
+                        <td class="col-num td-price">{{ d.totalValue | currency: auth.companyCurrency() }}</td>
                         <td class="td-actions" data-stop-nav (click)="$event.stopPropagation()">
                           @if (canManageFolders()) {
                             <div class="folder-item-menu-root table-kebab">
@@ -833,7 +847,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                         <td class="col-num">{{ p.cantidad }}</td>
                         <td class="col-num td-price">
                           @if (p.precio != null) {
-                            {{ p.precio | currency: companyCurrency() }}
+                            {{ p.precio | currency: auth.companyCurrency() }}
                           } @else {
                             —
                           }
@@ -912,9 +926,16 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       </div>
     </div>
 
-    <dialog #historialDialog class="modal historial-modal" (cancel)="$event.preventDefault()">
+    <dialog #historialDialog class="modal historial-modal" (click)="closeDialogOnBackdropClick($event, closeHistorial.bind(this))">
       <div class="modal-inner historial-inner">
-        <h3>Historial de stock — {{ historialTitulo() }}</h3>
+        <div class="modal-head-bar">
+          <h3 class="modal-head-bar__main">Historial de stock — {{ historialTitulo() }}</h3>
+          <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeHistorial()">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         @if (historialLoading()) {
           <p class="historial-muted">Cargando…</p>
         } @else if (historialRows().length === 0) {
@@ -937,7 +958,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
                     <td>{{ m.fecha | date: 'short' }}</td>
                     <td>
                       <span class="historial-tipo" [class.historial-tipo--in]="m.tipo === 'ENTRADA'" [class.historial-tipo--out]="m.tipo === 'SALIDA'">
-                        {{ historialTipoLabel(m.tipo) }}
+                        {{ tipoMovimientoLabel(m.tipo) }}
                       </span>
                     </td>
                     <td class="num historial-qty" [class.historial-qty--in]="m.tipo === 'ENTRADA'" [class.historial-qty--out]="m.tipo === 'SALIDA'">
@@ -951,94 +972,207 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             </table>
           </div>
         }
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeHistorial()">Cerrar</button>
-        </div>
       </div>
     </dialog>
 
-    <dialog #productDialog class="modal" (cancel)="$event.preventDefault()">
-      <div class="modal-inner">
-        <h3>{{ dialogTitle() }}</h3>
-        <form [formGroup]="form" (ngSubmit)="save()">
-          <label>
-            <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
-            <input type="text" formControlName="nombre" />
-          </label>
-          <label>
-            <span class="field-label">Cantidad <span class="required-mark" aria-hidden="true">*</span></span>
-            <input type="number" formControlName="cantidad" min="0" step="1" />
-          </label>
-          <label>
-            <span class="field-label">Precio <span class="required-mark" aria-hidden="true">*</span></span>
-            <input type="number" formControlName="precio" min="0" step="0.01" />
-          </label>
-          <label>
-            <span class="field-label">Stock mínimo</span>
-            <input
-              type="number"
-              formControlName="stockMinimo"
-              min="0"
-              step="1"
-              placeholder="Sin umbral"
-            />
-          </label>
-          <label>
-            Notas
-            <textarea formControlName="descripcion" rows="3" placeholder="Observaciones sobre el producto"></textarea>
-          </label>
-          <div class="photo-field">
-            <span class="photo-field-label">Imagen</span>
-            @if (previewUrl() || dialogImageUrl()) {
-              <img
-                [src]="previewUrl() || dialogImageUrl()!"
-                alt=""
-                class="photo-preview"
-              />
+    <dialog
+      #productDialog
+      class="modal modal--product"
+      (close)="onProductDialogClose()"
+      (click)="closeDialogOnBackdropClick($event, closeDialog.bind(this))"
+    >
+      <div class="modal-inner modal-inner--product">
+        <header class="product-modal-head modal-head-bar">
+          <h3 class="modal-title modal-head-bar__main">{{ dialogTitle() }}</h3>
+          <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeDialog()">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+        <form class="product-form" [formGroup]="form" (ngSubmit)="save()">
+          <div class="product-form-body">
+            @if (editingId() == null) {
+              <section class="pf-section pf-section--scan" aria-labelledby="pf-scan-title">
+                <div class="pf-section-head">
+                  <span class="pf-section-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                      <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2M16 5h2a2 2 0 0 1 2 2v2M16 19h2a2 2 0 0 0 2-2v-2M7 12h10" />
+                    </svg>
+                  </span>
+                  <div>
+                    <h4 id="pf-scan-title" class="pf-section-title">Código de barras</h4>
+                  </div>
+                </div>
+                <div class="pf-barcode-row">
+                  <label class="pf-barcode-field">
+                    <span class="sr-only">Código de barras</span>
+                    <input
+                      type="text"
+                      class="pf-input"
+                      formControlName="codigoBarras"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      placeholder="EAN / GTIN"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="pf-off-btn"
+                    [disabled]="offSearching() || !form.controls.codigoBarras.value.trim()"
+                    (click)="buscarOpenFoodFacts()"
+                  >
+                    @if (offSearching()) {
+                      <span class="pf-off-btn-spinner" aria-hidden="true"></span>
+                      Buscando…
+                    } @else {
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                        <path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                      Buscar
+                    }
+                  </button>
+                </div>
+                @if (offError()) {
+                  <p class="pf-off-error" role="alert">{{ offError() }}</p>
+                }
+                @if (offPreview(); as off) {
+                  <div class="pf-off-card" aria-live="polite">
+                    @if (off.imagenUrl && !previewUrl()) {
+                      <img [src]="off.imagenUrl" alt="" class="pf-off-card-img" />
+                    }
+                    <div class="pf-off-card-body">
+                      <p class="pf-off-card-name">{{ off.nombre }}</p>
+                      <div class="pf-off-card-badges">
+                        @if (off.nutriScore) {
+                          <span class="story-nutri" [class]="nutriScoreClass(off.nutriScore)">
+                            Nutri-Score {{ off.nutriScore | uppercase }}
+                          </span>
+                        }
+                        @if (off.alergenos.length) {
+                          <div class="story-allergen-tags">
+                            @for (tag of off.alergenos; track tag) {
+                              <span class="story-allergen-tag">{{ formatAlergenoTag(tag) }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+              </section>
             }
-            <div class="photo-upload">
-              <div class="photo-upload-inner">
-                <svg
-                  class="photo-upload-icon"
-                  width="24"
-                  height="24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M4.75 3A3.761 3.761 0 001 6.75v8a3.761 3.761 0 003.75 3.75h6.75c0-.515.056-1.017.161-1.5H8.214l5.05-4.886v.001a.406.406 0 01.284-.119c.1 0 .202.04.284.12v-.002l.664.643c.429-.299.892-.551 1.383-.75l-1.004-.97a1.903 1.903 0 00-1.326-.533c-.48 0-.96.178-1.326.532h-.001l-1.05 1.015-2.597-2.514a1.906 1.906 0 00-1.327-.532c-.48 0-.96.177-1.326.532L2.5 12.847V6.75c0-1.252.998-2.25 2.25-2.25h12c1.252 0 2.25.998 2.25 2.25v4.768c.518.036 1.02.129 1.5.272V6.75A3.761 3.761 0 0016.75 3h-12zm1.257 16.5h5.564c.074.52.206 1.023.389 1.5H9a3.742 3.742 0 01-2.993-1.5zM23 8.25v4.888a7.005 7.005 0 00-1.5-.964V5.257c.909.685 1.5 1.77 1.5 2.993zM15.25 6.5a1.25 1.25 0 100 2.5 1.25 1.25 0 000-2.5zm-8.001 3.996c.1 0 .201.04.283.12l2.563 2.478L6.057 17H4.75a2.23 2.23 0 01-2.233-2.082l4.448-4.303a.408.408 0 01.284-.119zM13 18.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm6-3.5a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3z"
+
+            <section class="pf-section" aria-labelledby="pf-data-title">
+              <h4 id="pf-data-title" class="pf-section-title pf-section-title--solo">Datos del producto</h4>
+              <label class="pf-field pf-field--full">
+                <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
+                <input type="text" class="pf-input" formControlName="nombre" placeholder="Nombre del producto" />
+              </label>
+              <div class="pf-metrics">
+                <label class="pf-field">
+                  <span class="field-label">Cantidad <span class="required-mark" aria-hidden="true">*</span></span>
+                  <input type="number" class="pf-input pf-input--num" formControlName="cantidad" min="0" step="1" />
+                </label>
+                <label class="pf-field">
+                  <span class="field-label">Precio <span class="required-mark" aria-hidden="true">*</span></span>
+                  <div class="pf-input-affix">
+                    <input type="number" class="pf-input pf-input--num" formControlName="precio" min="0" step="0.01" />
+                    <span class="pf-input-suffix" aria-hidden="true">{{ auth.companyCurrency() }}</span>
+                  </div>
+                </label>
+                <label class="pf-field">
+                  <span class="field-label">Stock mínimo</span>
+                  <input
+                    type="number"
+                    class="pf-input pf-input--num"
+                    formControlName="stockMinimo"
+                    min="0"
+                    step="1"
+                    placeholder="—"
                   />
-                </svg>
-                <span class="photo-upload-hint">(1 imagen, máx. 5 MB)</span>
+                </label>
               </div>
-              <input
-                type="file"
-                class="photo-upload-input"
-                aria-label="Subir imagen del producto"
-                accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
-                (change)="onFile($event)"
-              />
-            </div>
+            </section>
+
+            <section class="pf-section pf-section--extras" aria-labelledby="pf-extras-title">
+              <h4 id="pf-extras-title" class="sr-only">Notas e imagen</h4>
+              <div class="pf-extras-grid">
+                <label class="pf-field pf-field--notes">
+                  <span class="field-label">Notas</span>
+                  <textarea
+                    class="pf-input pf-textarea"
+                    formControlName="descripcion"
+                    rows="3"
+                    placeholder="Observaciones sobre el producto"
+                  ></textarea>
+                </label>
+                <div class="photo-field">
+                  <span class="field-label">Imagen</span>
+                  <div class="photo-panel">
+                    <div class="photo-upload">
+                      <div class="photo-upload-inner">
+                        @if (previewUrl() || dialogImageUrl()) {
+                          <img
+                            [src]="previewUrl() || dialogImageUrl()!"
+                            alt=""
+                            class="photo-preview"
+                          />
+                        } @else {
+                          <div class="photo-empty" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="28" height="28">
+                              <path
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"
+                              />
+                            </svg>
+                            <span class="photo-upload-hint">Subir imagen</span>
+                            <span class="photo-upload-meta">máx. 5 MB</span>
+                          </div>
+                        }
+                      </div>
+                      <input
+                        type="file"
+                        class="photo-upload-input"
+                        aria-label="Subir imagen del producto"
+                        accept="image/jpeg,image/jpg,image/jfif,image/png,image/gif,image/webp"
+                        (change)="onFile($event)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            @if (formError()) {
+              <p class="error" role="alert">{{ formError() }}</p>
+            }
           </div>
-          @if (formError()) {
-            <p class="error">{{ formError() }}</p>
-          }
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" (click)="closeDialog()">Cancelar</button>
+
+          <footer class="product-modal-footer product-modal-footer--end">
             <button type="submit" class="btn-submit" [disabled]="form.invalid || saving()">
-              {{ saving() ? 'Guardando…' : 'Guardar' }}
+              {{ saving() ? 'Guardando…' : (editingId() == null ? 'Crear producto' : 'Guardar cambios') }}
             </button>
-          </div>
+          </footer>
         </form>
       </div>
     </dialog>
 
-    <dialog #folderDialog class="modal" (cancel)="$event.preventDefault()">
+    <dialog #folderDialog class="modal" (click)="closeDialogOnBackdropClick($event, closeFolderDialog.bind(this))">
       <div class="modal-inner">
-        <h3>Nueva carpeta</h3>
+        <div class="modal-head-bar">
+          <h3 class="modal-head-bar__main">Nueva carpeta</h3>
+          <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeFolderDialog()">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <form [formGroup]="folderForm" (ngSubmit)="saveFolder()">
           <label>
             <span class="field-label">Nombre <span class="required-mark" aria-hidden="true">*</span></span>
@@ -1051,8 +1185,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
           @if (folderFormError()) {
             <p class="error">{{ folderFormError() }}</p>
           }
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" (click)="closeFolderDialog()">Cancelar</button>
+          <div class="modal-actions modal-actions--end">
             <button type="submit" class="btn-submit" [disabled]="folderForm.invalid || folderSaving()">
               {{ folderSaving() ? 'Guardando…' : 'Guardar' }}
             </button>
@@ -1061,10 +1194,19 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       </div>
     </dialog>
 
-    <dialog #moveTargetDialog class="modal modal--move-picker" (cancel)="$event.preventDefault()">
+    <dialog #moveTargetDialog class="modal modal--move-picker" (click)="closeDialogOnBackdropClick($event, closeMoveDialog.bind(this))">
       <div class="modal-inner modal-inner--move-picker">
-        <h3>{{ moveDialogTitle() }}</h3>
-        <p class="move-picker-hint">Carpeta destino</p>
+        <div class="modal-head-bar">
+          <div class="modal-head-bar__main">
+            <h3>{{ moveDialogTitle() }}</h3>
+            <p class="move-picker-hint">Carpeta destino</p>
+          </div>
+          <button type="button" class="modal-close" aria-label="Cerrar" (click)="closeMoveDialog()">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <nav class="productos-tree-nav move-picker-tree" aria-label="Carpeta destino">
           <button
             type="button"
@@ -1108,8 +1250,7 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
             </button>
           }
         </nav>
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeMoveDialog()">Cancelar</button>
+        <div class="modal-actions modal-actions--end">
           <button type="button" class="btn-submit" (click)="confirmMoveFromPicker()">Mover</button>
         </div>
       </div>
@@ -2472,19 +2613,330 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
     }
 
+    .modal--product {
+      max-width: min(34rem, calc(100vw - 1.5rem));
+    }
+
     .modal::backdrop {
       background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(4px);
     }
 
     .modal-inner {
       padding: 1.35rem;
+      background: var(--inv-surface);
+      border-radius: 16px;
+    }
+
+    .modal-inner--product {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      max-height: min(90vh, 52rem);
+      overflow: hidden;
     }
 
     .modal h3 {
       margin: 0 0 1rem;
       font-size: 1.15rem;
       font-weight: 700;
+    }
+
+    .product-modal-head {
+      padding: 1.35rem 1.5rem 0;
+      flex-shrink: 0;
+    }
+
+    .modal-eyebrow {
+      margin: 0 0 0.2rem;
+      color: var(--inv-cta);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 1.22rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--inv-text);
+    }
+
+    .modal-subtitle {
+      margin: 0.45rem 0 0;
+      color: var(--inv-muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      font-weight: 400;
+    }
+
+    .product-form {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .product-form-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      padding: 1rem 1.5rem 0.5rem;
+    }
+
+    .pf-section {
+      padding: 0 0 1.1rem;
+      margin-bottom: 1.1rem;
+      border-bottom: 1px solid var(--inv-border);
+    }
+
+    .pf-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0.25rem;
+    }
+
+    .pf-section--scan {
+      padding: 0.85rem 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--inv-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    .pf-section-head {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+
+    .pf-section-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 8px;
+      background: rgba(30, 64, 175, 0.1);
+      color: var(--inv-cta);
+      flex-shrink: 0;
+    }
+
+    .pf-section-title {
+      margin: 0;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--inv-text);
+    }
+
+    .pf-section-title--solo {
+      margin-bottom: 0.75rem;
+    }
+
+    .pf-section-hint {
+      margin: 0.15rem 0 0;
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--inv-muted);
+      line-height: 1.4;
+    }
+
+    .pf-barcode-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+
+    .pf-barcode-field {
+      min-width: 0;
+    }
+
+    .pf-off-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0 1rem;
+      min-height: 2.65rem;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      border: 1px solid var(--inv-cta);
+      border-radius: 10px;
+      background: var(--inv-cta);
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .pf-off-btn:hover:not(:disabled) {
+      background: var(--inv-cta-hover);
+      border-color: var(--inv-cta-hover);
+      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.22);
+    }
+
+    .pf-off-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .pf-off-btn-spinner {
+      width: 0.9rem;
+      height: 0.9rem;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: pf-spin 0.7s linear infinite;
+    }
+
+    @keyframes pf-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .pf-off-error {
+      margin: 0.5rem 0 0;
+      font-size: 0.84rem;
+      color: var(--inv-danger);
+    }
+
+    .pf-off-card {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin-top: 0.75rem;
+      padding: 0.65rem;
+      border: 1px solid var(--inv-border);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .pf-off-card-img {
+      width: 4.5rem;
+      height: 4.5rem;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--inv-border);
+      flex-shrink: 0;
+    }
+
+    .pf-off-card-body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .pf-off-card-name {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--inv-text);
+      line-height: 1.35;
+    }
+
+    .pf-off-card-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    .pf-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .pf-extras-grid {
+      display: grid;
+      grid-template-columns: 1fr minmax(9.5rem, 11.5rem);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .pf-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .pf-field--full {
+      margin-bottom: 0.65rem;
+    }
+
+    .pf-input-affix {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .pf-input-affix .pf-input {
+      padding-right: 2.75rem;
+      width: 100%;
+    }
+
+    .pf-input-suffix {
+      position: absolute;
+      right: 0.65rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--inv-muted);
+      pointer-events: none;
+    }
+
+    .pf-input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--inv-border-strong);
+      border-radius: 10px;
+      font: inherit;
+      background: #ffffff;
+      color: var(--inv-text);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .pf-input--num {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pf-textarea {
+      resize: vertical;
+      min-height: 5.5rem;
+      line-height: 1.45;
+    }
+
+    .pf-input:focus,
+    .pf-textarea:focus {
+      outline: none;
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     form {
@@ -2505,10 +2957,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .field-label {
       display: block;
       line-height: 1.3;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--inv-text-soft);
     }
 
     .required-mark {
-      color: var(--inv-cta, #b91c1c);
+      color: var(--inv-cta);
       font-weight: 700;
     }
 
@@ -2519,10 +2974,13 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       border: 1px solid var(--inv-border-strong);
       border-radius: 10px;
       font: inherit;
-      resize: vertical;
-      min-height: 4rem;
       background: #ffffff;
       transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 4rem;
     }
 
     input[type='text']:focus,
@@ -2536,42 +2994,51 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
     .photo-field {
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.35rem;
     }
 
-    .photo-field-label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: #374151;
+    .photo-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .photo-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      width: 100%;
+      min-height: 5.5rem;
+      color: var(--inv-muted);
     }
 
     .photo-preview {
+      display: block;
       width: 100%;
-      max-height: 10rem;
+      aspect-ratio: 1;
+      max-height: 9rem;
       object-fit: contain;
-      border: 1px solid var(--inv-border);
-      border-radius: 8px;
-      background: #fafafa;
     }
 
     .photo-upload {
       position: relative;
       width: 100%;
       min-height: 5.5rem;
-      border: 2px dashed var(--inv-border);
-      border-radius: 8px;
-      background: #fafafa;
+      border: 1px dashed var(--inv-border-strong);
+      border-radius: 10px;
+      background: #f8fafc;
       transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
     }
 
     .photo-upload:hover {
-      border-color: #d1d5db;
-      background: #f9fafb;
+      border-color: var(--inv-cta);
+      background: #fff;
     }
 
     .photo-upload:focus-within {
-      border-color: #c4c4c4;
-      box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+      border-color: var(--inv-cta);
+      box-shadow: var(--inv-focus-ring);
       outline: none;
     }
 
@@ -2580,22 +3047,30 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0.45rem;
-      padding: 0.95rem 0.75rem;
+      min-height: 5.5rem;
+      padding: 0.5rem;
       pointer-events: none;
       color: var(--inv-muted);
     }
 
     .photo-upload-icon {
       flex-shrink: 0;
-      opacity: 0.9;
+      color: var(--inv-cta);
     }
 
     .photo-upload-hint {
-      font-size: 0.72rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.3;
+      color: var(--inv-text-soft);
+    }
+
+    .photo-upload-meta {
+      font-size: 0.65rem;
       font-weight: 500;
       text-align: center;
-      line-height: 1.35;
+      line-height: 1.3;
       color: var(--inv-muted);
     }
 
@@ -2618,11 +3093,46 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
       margin-top: 0.15rem;
     }
 
+    .product-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      padding: 0.85rem 1.5rem 1.25rem;
+      border-top: 1px solid var(--inv-border);
+      background: var(--inv-surface);
+      flex-shrink: 0;
+    }
+
     .modal-actions {
       display: flex;
       justify-content: flex-end;
       gap: 0.5rem;
       margin-top: 0.85rem;
+    }
+
+    @media (max-width: 520px) {
+      .pf-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .pf-extras-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .pf-barcode-row {
+        grid-template-columns: 1fr;
+      }
+
+      .pf-off-btn {
+        width: 100%;
+      }
+
+      .product-modal-head,
+      .product-form-body,
+      .product-modal-footer {
+        padding-left: 1.1rem;
+        padding-right: 1.1rem;
+      }
     }
 
     .btn-secondary {
@@ -2685,10 +3195,17 @@ function flattenCarpetasForTree(nodes: CarpetaArbolDto[], depth = 0): CarpetaTre
   `,
 })
 export class ProductosComponent implements OnInit {
+  protected readonly closeDialogOnBackdropClick = closeDialogOnBackdropClick;
   protected readonly formatProductoCategorias = formatProductoCategorias;
+  protected readonly formatAlergenoTag = formatAlergenoTag;
+  protected readonly esStockBajo = esStockBajo;
+  protected readonly tipoMovimientoLabel = tipoMovimientoLabel;
+  protected readonly movCantidadDisplay = movCantidadDisplay;
+  protected readonly nutriScoreClass = nutriScoreClass;
 
   private readonly api = inject(CatalogoApiService);
-  private readonly auth = inject(AuthService);
+  private readonly offApi = inject(OpenFoodFactsApiService);
+  protected readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -2802,6 +3319,9 @@ export class ProductosComponent implements OnInit {
   protected readonly saving = signal(false);
   protected readonly previewUrl = signal<string | null>(null);
   protected readonly dialogImageUrl = signal<string | null>(null);
+  protected readonly offSearching = signal(false);
+  protected readonly offError = signal('');
+  protected readonly offPreview = signal<OpenFoodFactsProductDto | null>(null);
 
   private file: File | null = null;
 
@@ -2814,6 +3334,7 @@ export class ProductosComponent implements OnInit {
   });
 
   protected readonly form = this.fb.group({
+    codigoBarras: this.fb.nonNullable.control(''),
     nombre: this.fb.nonNullable.control('', Validators.required),
     cantidad: this.fb.nonNullable.control(0, {
       validators: [Validators.required, Validators.min(0)],
@@ -2824,10 +3345,6 @@ export class ProductosComponent implements OnInit {
     stockMinimo: this.fb.control<number | null>(null),
     descripcion: this.fb.nonNullable.control(''),
   });
-
-  protected companyCurrency(): string {
-    return this.auth.currentUser()?.companyCurrency ?? 'EUR';
-  }
 
   ngOnInit(): void {
     this.api.getCategorias().subscribe({
@@ -3118,19 +3635,11 @@ export class ProductosComponent implements OnInit {
 
   /** Empleado o administrador de empresa (no solo lectura). */
   protected canEmployeeCatalog(): boolean {
-    const r = this.auth.currentUser()?.companyRole;
-    return r === 'company_admin' || r === 'employee';
+    return hasEmployeeCatalogRole(this.auth.currentUser()?.companyRole);
   }
 
   protected canManageFolders(): boolean {
     return this.canEmployeeCatalog();
-  }
-
-  protected esStockBajo(p: ProductoDto): boolean {
-    if (p.stockMinimo == null) {
-      return false;
-    }
-    return p.cantidad <= p.stockMinimo;
   }
 
   protected onSearch(ev: Event): void {
@@ -3189,33 +3698,6 @@ export class ProductosComponent implements OnInit {
 
   protected closeHistorial(): void {
     this.historialDialogRef()?.nativeElement.close();
-  }
-
-  protected historialTipoLabel(tipo: string): string {
-    switch (tipo) {
-      case 'ENTRADA':
-        return 'Entrada';
-      case 'SALIDA':
-        return 'Salida';
-      case 'AJUSTE':
-        return 'Ajuste';
-      default:
-        return tipo;
-    }
-  }
-
-  /** Cantidad con signo según tipo (entrada +n, salida −n). */
-  protected movCantidadDisplay(m: MovimientoStockDto): string {
-    switch (m.tipo) {
-      case 'ENTRADA':
-        return `+${m.cantidad}`;
-      case 'SALIDA':
-        return `−${m.cantidad}`;
-      case 'AJUSTE':
-        return `→ ${m.cantidad}`;
-      default:
-        return String(m.cantidad);
-    }
   }
 
   protected confirmDeleteFromMenu(p: ProductoDto): void {
@@ -3447,12 +3929,20 @@ export class ProductosComponent implements OnInit {
   }
 
   protected openCreate(): void {
-    if (!this.canCreateProduct()) {
+    if (!this.canEmployeeCatalog()) {
       return;
     }
     this.editingId.set(null);
     this.dialogTitle.set('Nuevo producto');
-    this.form.reset({ nombre: '', cantidad: 0, precio: 0, stockMinimo: null, descripcion: '' });
+    this.form.reset({
+      codigoBarras: '',
+      nombre: '',
+      cantidad: 0,
+      precio: 0,
+      stockMinimo: null,
+      descripcion: '',
+    });
+    this.clearOffPreview();
     this.clearFileSelection();
     this.formError.set('');
     this.dialogRef()?.nativeElement.showModal();
@@ -3475,8 +3965,46 @@ export class ProductosComponent implements OnInit {
   }
 
   protected closeDialog(): void {
-    this.clearFileSelection();
     this.dialogRef()?.nativeElement.close();
+  }
+
+  protected onProductDialogClose(): void {
+    this.clearOffPreview();
+    this.clearFileSelection();
+  }
+
+  protected buscarOpenFoodFacts(): void {
+    const code = this.form.controls.codigoBarras.value?.trim() ?? '';
+    if (!code) return;
+    this.offSearching.set(true);
+    this.offError.set('');
+    this.offPreview.set(null);
+    this.offApi.buscarProducto(code).subscribe({
+      next: (off) => {
+        this.offPreview.set(off);
+        this.form.patchValue({
+          codigoBarras: off.codigoBarras,
+          nombre: off.nombre,
+        });
+        if (off.imagenUrl) {
+          this.dialogImageUrl.set(off.imagenUrl);
+        }
+        this.offSearching.set(false);
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.offSearching.set(false);
+        const msg = err?.error?.message;
+        this.offError.set(
+          typeof msg === 'string' ? msg : 'Producto no encontrado en Open Food Facts',
+        );
+      },
+    });
+  }
+
+  private clearOffPreview(): void {
+    this.offPreview.set(null);
+    this.offError.set('');
+    this.offSearching.set(false);
   }
 
   protected onFile(ev: Event): void {
@@ -3504,16 +4032,30 @@ export class ProductosComponent implements OnInit {
     }
     const v = this.form.getRawValue();
     const editing = this.editingId();
+    const off = this.offPreview();
     const payload: ProductoFormPayload = {
       nombre: v.nombre.trim(),
       cantidad: v.cantidad,
       precio: v.precio,
-      stockMinimo: this.normalizeStockMinimo(v.stockMinimo),
+      stockMinimo: normalizeStockMinimo(v.stockMinimo),
       descripcion: typeof v.descripcion === 'string' ? v.descripcion.trim() : '',
       imagen: this.file,
     };
-    if (editing == null && this.currentCarpetaId() != null) {
-      payload.carpetaId = this.currentCarpetaId();
+    if (editing == null) {
+      const codigoBarras = v.codigoBarras?.trim();
+      if (codigoBarras) {
+        payload.codigoBarras = codigoBarras;
+      }
+      if (off) {
+        payload.nutriScore = off.nutriScore;
+        payload.alergenos = off.alergenos;
+        if (!this.file && off.imagenUrl) {
+          payload.imagenUrl = off.imagenUrl;
+        }
+      }
+      if (this.currentCarpetaId() != null) {
+        payload.carpetaId = this.currentCarpetaId();
+      }
     }
     this.formError.set('');
     this.saving.set(true);
@@ -3525,23 +4067,11 @@ export class ProductosComponent implements OnInit {
         this.closeDialog();
         this.refreshList();
       },
-      error: (err: { error?: { message?: string }; message?: string }) => {
+      error: (err: unknown) => {
         this.saving.set(false);
-        const msg = err?.error?.message ?? err?.message ?? 'Error al guardar';
-        this.formError.set(typeof msg === 'string' ? msg : 'Error al guardar');
+        this.formError.set(extractApiError(err, 'Error al guardar'));
       },
     });
-  }
-
-  private normalizeStockMinimo(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-    const n = typeof value === 'number' ? value : Number(value);
-    if (Number.isNaN(n)) {
-      return null;
-    }
-    return n < 0 ? null : Math.floor(n);
   }
 
   protected confirmDelete(p: ProductoDto): void {
@@ -3558,11 +4088,7 @@ export class ProductosComponent implements OnInit {
     });
   }
 
-  protected canCreateProduct(): boolean {
-    return this.auth.currentUser()?.companyRole === 'company_admin';
-  }
-
   protected canDeleteProduct(): boolean {
-    return this.auth.currentUser()?.companyRole === 'company_admin';
+    return checkCanDeleteProduct(this.auth.currentUser()?.companyRole);
   }
 }

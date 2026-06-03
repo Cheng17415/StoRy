@@ -18,6 +18,9 @@ export interface ProductoDto {
   nombre: string;
   descripcion: string | null;
   codigo: string;
+  codigoBarras: string | null;
+  nutriScore: string | null;
+  alergenos: string[];
   precio: number | null;
   cantidad: number;
   stockMinimo: number | null;
@@ -28,6 +31,21 @@ export interface ProductoDto {
   categorias: CategoriaDto[];
   carpetaId: number | null;
   carpetaNombre: string | null;
+}
+
+export interface OpenFoodFactsProductDto {
+  codigoBarras: string;
+  nombre: string;
+  imagenUrl: string | null;
+  nutriScore: string | null;
+  alergenos: string[];
+}
+
+/** Etiqueta legible de un tag OFF (p. ej. `en:milk` → `milk`). */
+export function formatAlergenoTag(tag: string): string {
+  const idx = tag.indexOf(':');
+  const raw = idx >= 0 ? tag.slice(idx + 1) : tag;
+  return raw.replace(/-/g, ' ');
 }
 
 /** Texto legible de categorías para listados y tablas. */
