@@ -39,7 +39,7 @@ export class AuthService {
     if (url.startsWith('/producto/')) {
       return true;
     }
-    const paths = ['/productos', '/estadisticas', '/stock-bajo', '/categorias'];
+    const paths = ['/productos', '/estadisticas', '/stock', '/categorias'];
     return paths.some((p) => url === p || url.startsWith(`${p}/`));
   }
 

@@ -36,11 +36,11 @@ export const routes: Routes = [
       import('./features/inventario/estadisticas.component').then((m) => m.EstadisticasComponent),
   },
   {
-    path: 'stock-bajo',
+    path: 'stock',
     canActivate: [authGuard, companyGuard],
-    loadComponent: () =>
-      import('./features/catalogo/stock-bajo-minimo.component').then((m) => m.StockBajoMinimoComponent),
+    loadComponent: () => import('./features/catalogo/stock.component').then((m) => m.StockComponent),
   },
+  { path: 'stock-bajo', redirectTo: 'stock', pathMatch: 'full' },
   {
     path: 'producto/:id',
     canActivate: [authGuard, companyGuard],

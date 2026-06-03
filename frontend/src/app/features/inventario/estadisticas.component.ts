@@ -34,6 +34,8 @@ interface PeriodoPresetOption {
   imports: [RouterLink, CurrencyPipe],
   template: `
     <div class="stats-page">
+      <div class="stats-page-layout">
+        <aside class="stats-sidebar">
       <section class="stats-filters" aria-labelledby="filtros-stats">
         <h2 id="filtros-stats" class="sr-only">Filtros</h2>
         <article class="filter-card filter-card--period">
@@ -45,19 +47,13 @@ interface PeriodoPresetOption {
             </span>
             <div class="filter-card-titles">
               <h3 class="filter-card-title">Periodo</h3>
-              <p class="filter-card-sub">{{ periodoLabel() }}</p>
+              <p class="filter-card-sub">
+                {{ periodoLabel() }}
+                @if (loading()) {
+                  <span class="period-loading" aria-live="polite"> · Cargando…</span>
+                }
+              </p>
             </div>
-            <button type="button" class="btn-apply" (click)="cargar()" [disabled]="loading() || !rangoValido()">
-              @if (loading()) {
-                <span class="spinner" aria-hidden="true"></span>
-                Cargando…
-              } @else {
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                  <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 16v5h5M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 8V3h-5" />
-                </svg>
-                Actualizar
-              }
-            </button>
           </header>
           <div class="date-presets" role="group" aria-label="Periodos rápidos">
             @for (opt of periodoPresets; track opt.id) {
@@ -221,13 +217,16 @@ interface PeriodoPresetOption {
             </div>
           </article>
         </div>
+      </section>
+        </aside>
+
+        <div class="stats-main">
         @if (errorMsg()) {
           <p class="stats-error" role="alert">{{ errorMsg() }}</p>
         }
         @if (loading() && !data()) {
           <p class="stats-muted stats-loading">Cargando datos del periodo…</p>
         }
-      </section>
 
       @if (data(); as d) {
         <section class="kpi-row kpi-row--primary" aria-label="Estado actual del inventario">
@@ -399,6 +398,8 @@ interface PeriodoPresetOption {
           </div>
         </div>
       }
+        </div>
+      </div>
     </div>
   `,
   styles: `
@@ -407,9 +408,36 @@ interface PeriodoPresetOption {
     }
 
     .stats-page {
-      max-width: 72rem;
+      max-width: 80rem;
       margin: 0 auto;
       padding: 0.5rem 1rem 3rem;
+    }
+
+    .stats-page-layout {
+      display: grid;
+      grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .stats-sidebar {
+      position: sticky;
+      top: 0.75rem;
+      max-height: calc(100vh - 6rem);
+      overflow: auto;
+    }
+
+    .stats-main {
+      min-width: 0;
+    }
+
+    .stats-filters {
+      margin-bottom: 0;
+      padding: 0.75rem;
+      background: var(--story-surface);
+      border: 1px solid var(--story-border);
+      border-radius: 14px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
     }
 
     .stats-head {
@@ -498,15 +526,6 @@ interface PeriodoPresetOption {
 
     .mini-bars .accent {
       background: linear-gradient(180deg, #fbbf24, var(--story-accent));
-    }
-
-    .stats-filters {
-      margin-bottom: 1rem;
-      padding: 0.75rem 0.85rem;
-      background: var(--story-surface);
-      border: 1px solid var(--story-border);
-      border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
     }
 
     .filter-card--period {
@@ -630,52 +649,9 @@ interface PeriodoPresetOption {
       color: var(--story-danger);
     }
 
-    .btn-apply {
-      min-height: 2.5rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      padding: 0 0.95rem;
-      border: 1px solid var(--story-primary);
-      border-radius: 10px;
-      background: var(--story-primary);
-      color: var(--story-on-primary);
-      font: inherit;
-      font-size: 0.86rem;
+    .period-loading {
       font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
-      transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.05s ease;
-    }
-
-    .btn-apply:hover:not(:disabled) {
-      background: var(--story-primary-hover);
-      border-color: var(--story-primary-hover);
-      box-shadow: 0 6px 16px rgba(30, 64, 175, 0.3);
-    }
-
-    .btn-apply:active:not(:disabled) {
-      transform: translateY(1px);
-    }
-
-    .btn-apply:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-top-color: #ffffff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+      color: var(--story-primary);
     }
 
     .stats-error {
@@ -696,8 +672,8 @@ interface PeriodoPresetOption {
     }
 
     .filters-scope {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: 0.75rem;
       margin-top: 0.85rem;
       padding-top: 0.85rem;
@@ -1210,6 +1186,18 @@ interface PeriodoPresetOption {
       white-space: nowrap;
     }
 
+    @media (max-width: 960px) {
+      .stats-page-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-sidebar {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
     @media (max-width: 860px) {
       .stats-head {
         align-items: flex-start;
@@ -1229,16 +1217,8 @@ interface PeriodoPresetOption {
         padding-inline: 0.25rem;
       }
 
-      .filters-scope {
-        grid-template-columns: 1fr;
-      }
-
       .filter-card-head {
         flex-wrap: wrap;
-      }
-
-      .btn-apply {
-        width: 100%;
       }
 
       .date-range {
@@ -1379,6 +1359,7 @@ export class EstadisticasComponent implements OnInit {
     if (v) {
       this.desdeStr.set(v);
       this.presetActivo.set('custom');
+      this.cargar();
     }
   }
 
@@ -1387,6 +1368,7 @@ export class EstadisticasComponent implements OnInit {
     if (v) {
       this.hastaStr.set(v);
       this.presetActivo.set('custom');
+      this.cargar();
     }
   }
 
@@ -1403,6 +1385,7 @@ export class EstadisticasComponent implements OnInit {
     this.categoriasSeleccionadas.set(
       cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
     );
+    this.cargar();
   }
 
   protected toggleCarpetaChip(id: number): void {
@@ -1410,6 +1393,7 @@ export class EstadisticasComponent implements OnInit {
     this.carpetasSeleccionadas.set(
       cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
     );
+    this.cargar();
   }
 
   protected filtrosCategoriaActivos(): number {
@@ -1422,20 +1406,24 @@ export class EstadisticasComponent implements OnInit {
 
   protected toggleCategoriaRaiz(): void {
     this.categoriaRaizSeleccionada.update((v) => !v);
+    this.cargar();
   }
 
   protected toggleCarpetaRaiz(): void {
     this.carpetaRaizSeleccionada.update((v) => !v);
+    this.cargar();
   }
 
   protected limpiarCategorias(): void {
     this.categoriasSeleccionadas.set([]);
     this.categoriaRaizSeleccionada.set(false);
+    this.cargar();
   }
 
   protected limpiarCarpetas(): void {
     this.carpetasSeleccionadas.set([]);
     this.carpetaRaizSeleccionada.set(false);
+    this.cargar();
   }
 
   protected cargar(): void {
