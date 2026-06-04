@@ -1,0 +1,21 @@
+# Cloud Run: pocas conexiones; pooler transaction (6543) en deploy.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+      idle-timeout: 60000
+      max-lifetime: 300000
+      connection-timeout: 20000
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    postgresql:
+      transactional-lock: false
+
+logging:
+  level:
+    com.story: info
