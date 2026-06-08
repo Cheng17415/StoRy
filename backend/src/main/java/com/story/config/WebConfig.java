@@ -13,10 +13,19 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        String[] origins = allowedOrigins.split("\\s*,\\s*");
-        registry.addMapping("/api/**")
-                .allowedOrigins(origins)
+        // Cloud Run expone dos formatos de URL (*.europe-west1.run.app y *.*.a.run.app).
+        var cors = registry.addMapping("/api/**")
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("*");
+                .allowedHeaders("*")
+                .allowedOriginPatterns(
+                        "http://localhost:4200",
+                        "https://story-frontend-*.europe-west1.run.app",
+                        "https://story-frontend-*.a.run.app"
+                );
+        for (String origin : allowedOrigins.split("\\s*,\\s*")) {
+            if (!origin.isBlank()) {
+                cors.allowedOriginPatterns(origin.trim());
+            }
+        }
     }
 }

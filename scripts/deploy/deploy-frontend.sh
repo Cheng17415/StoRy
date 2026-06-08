@@ -42,17 +42,28 @@ fi
 cloud_run_deploy "$SERVICE_FRONTEND" "$IMAGE" "$ENV_YAML"
 
 FRONTEND_URL="$(cloud_run_url "$SERVICE_FRONTEND")"
+# Cloud Run publica también URL con número de proyecto (mismo servicio, otro host).
+FRONTEND_URL_ALT="https://${SERVICE_FRONTEND}-$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)').${GCP_REGION}.run.app"
 echo ""
 echo "Frontend desplegado: ${SERVICE_FRONTEND}"
 echo "URL: ${FRONTEND_URL}"
+echo "URL alternativa: ${FRONTEND_URL_ALT}"
 
 # Solo añade CORS/invitaciones; no reemplaza todo el .env (evita revisiones rotas).
 echo "Actualizando CORS e invitaciones en ${SERVICE_BACKEND}..."
 gcloud run services update "$SERVICE_BACKEND" \
   --region="$GCP_REGION" \
   --platform=managed \
-  --update-env-vars="APP_CORS_ALLOWED_ORIGINS=${FRONTEND_URL},APP_COMPANY_INVITE_URL_BASE=${FRONTEND_URL}/empresa?inviteToken=" \
+  --update-env-vars="^:^APP_CORS_ALLOWED_ORIGINS=${FRONTEND_URL},${FRONTEND_URL_ALT}" \
   --quiet
+gcloud run services update "$SERVICE_BACKEND" \
+  --region="$GCP_REGION" \
+  --platform=managed \
+  --update-env-vars="APP_COMPANY_INVITE_URL_BASE=${FRONTEND_URL}/empresa?inviteToken=" \
+  --quiet
+
+# shellcheck source=print-google-oauth-origins.sh
+bash "$SCRIPT_DIR/print-google-oauth-origins.sh" || true
 
 echo ""
 echo "Listo. Abre: ${FRONTEND_URL}"
