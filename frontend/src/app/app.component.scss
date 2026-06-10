@@ -219,7 +219,7 @@ a.user-dropdown-item {
 
 .app-footer {
   margin-top: auto;
-  padding: 0.85rem 1.25rem;
+  padding: 1rem 1.25rem;
   background: var(--story-bg-header);
   color: rgba(255, 255, 255, 0.88);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -232,9 +232,25 @@ a.user-dropdown-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem 0.5rem;
-  text-align: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+}
+
+.app-footer-brand {
+  margin: 0;
+}
+
+.app-footer-mark {
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.app-footer-reg {
+  font-size: 0.65em;
+  font-weight: 600;
+  margin-left: 0.05em;
 }
 
 .app-footer-name {
@@ -242,18 +258,47 @@ a.user-dropdown-item {
   color: #fff;
 }
 
-.app-footer-sep {
-  color: rgba(255, 255, 255, 0.45);
-  user-select: none;
+.app-footer-social {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.app-footer-contact {
-  color: var(--story-secondary);
+.app-footer-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   text-decoration: none;
-  font-weight: 500;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
-.app-footer-contact:hover {
-  color: #93c5fd;
-  text-decoration: underline;
+.app-footer-social-link:hover {
+  color: #fff;
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.45);
+  transform: translateY(-1px);
+}
+
+.app-footer-social-link:focus-visible {
+  outline: 2px solid var(--story-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .app-footer-inner {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
 }
