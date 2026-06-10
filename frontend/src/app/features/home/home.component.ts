@@ -9,10 +9,6 @@ import { RouterLink } from '@angular/router';
     <div class="landing">
       <section class="hero" aria-labelledby="landing-title">
         <div class="hero-copy">
-          <span class="eyebrow">
-            <span class="dot" aria-hidden="true"></span>
-            Inventario, sin estrés
-          </span>
           <h1 id="landing-title">
             Tu stock,<br />
             <span class="accent">en un solo sitio claro.</span>
@@ -109,8 +105,6 @@ import { RouterLink } from '@angular/router';
             </div>
           </div>
 
-          <div class="blob blob-1"></div>
-          <div class="blob blob-2"></div>
         </div>
       </section>
 
@@ -205,10 +199,6 @@ import { RouterLink } from '@angular/router';
       gap: 2.5rem;
       align-items: center;
       padding: 2.75rem 2rem;
-      background:
-        radial-gradient(1200px 400px at -10% -20%, rgba(59, 130, 246, 0.18), transparent 60%),
-        radial-gradient(900px 360px at 110% 120%, rgba(245, 158, 11, 0.16), transparent 60%),
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border: 1px solid var(--story-border);
       border-radius: 24px;
       box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
@@ -360,22 +350,6 @@ import { RouterLink } from '@angular/router';
       opacity: 0.5;
       z-index: 0;
       pointer-events: none;
-    }
-
-    .blob-1 {
-      width: 220px;
-      height: 220px;
-      background: rgba(59, 130, 246, 0.45);
-      top: -40px;
-      right: -30px;
-    }
-
-    .blob-2 {
-      width: 180px;
-      height: 180px;
-      background: rgba(245, 158, 11, 0.4);
-      bottom: -30px;
-      left: 10px;
     }
 
     .mock {
